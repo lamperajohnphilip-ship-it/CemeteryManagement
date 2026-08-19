@@ -14,12 +14,12 @@ interface Announcement {
   title: string;
   content: string;
   category: string;
-  badge: string;
+  badge: string | null;
   visibility: string;
   status: string;
   date: string;
-  validFrom: string;
-  validUntil: string;
+  validFrom: string | null;
+  validUntil: string | null;
   views: number;
   reactions: { like: number; heart: number; pray: number };
   comments: any[];
@@ -51,7 +51,7 @@ export default function AnnouncementsPage() {
     try {
       const res = await getAnnouncements(false);
       if (res.success && res.announcements) {
-        setAnnouncements(res.announcements);
+        setAnnouncements(res.announcements as any);
       }
     } catch (e) {
       console.error("Error loading announcements:", e);
@@ -141,8 +141,8 @@ export default function AnnouncementsPage() {
     setFormCategory(ann.category);
     setFormVisibility(ann.visibility);
     setFormContent(ann.content);
-    setFormValidFrom(ann.validFrom);
-    setFormValidUntil(ann.validUntil);
+    setFormValidFrom(ann.validFrom || '');
+    setFormValidUntil(ann.validUntil || '');
     setShowCompose(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -286,7 +286,7 @@ export default function AnnouncementsPage() {
               <div key={ann.id} className={styles.announcementItem}>
                 <div className={styles.announcementHeader}>
                   <div className={styles.announcementMeta}>
-                    <span className={styles.announcementBadge}>{ann.badge}</span>
+                    <span className={styles.announcementBadge}>{ann.badge || 'NOTICE'}</span>
                     <span className={styles.announcementTitle}>{ann.title}</span>
                   </div>
                   <div className={styles.announcementDate}>
