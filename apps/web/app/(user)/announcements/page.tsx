@@ -9,9 +9,13 @@ interface Announcement {
   id: number;
   title: string;
   category: string;
-  badge?: string;
+  badge?: string | null;
   date: string;
   content: string;
+  status?: string;
+  visibility?: string;
+  validFrom?: string | null;
+  validUntil?: string | null;
 }
 
 export default function AnnouncementsPage() {
@@ -22,7 +26,7 @@ export default function AnnouncementsPage() {
     try {
       const res = await getAnnouncements(incrementViews);
       if (res.success && res.announcements) {
-        setAnnouncements(res.announcements);
+        setAnnouncements(res.announcements as any);
       }
     } catch (e) {
       console.error("Error loading announcements:", e);
@@ -58,7 +62,7 @@ export default function AnnouncementsPage() {
       <div className={styles.annHeader}>
         <div className={styles.subhead}>MUNICIPALITY OF JASAAN · CEMETERY OFFICE</div>
         <h1>ANNOUNCEMENTS</h1>
-        <div className={styles.description}>Official notices, events & updates from the cemetery office</div>
+        <div className={styles.description}>Official notices, events &amp; updates from the cemetery office</div>
       </div>
 
       <div className={styles.filterTabs}>
@@ -83,7 +87,7 @@ export default function AnnouncementsPage() {
               <circle cx="18" cy="5" r="2" fill="currentColor" stroke="none" opacity="0.4" />
             </svg>
             <h3>No Announcements Yet</h3>
-            <p>The cemetery office hasn't posted any announcements.<br />Please check back later for updates.</p>
+            <p>The cemetery office hasn&apos;t posted any announcements.<br />Please check back later for updates.</p>
             <div className={styles.adminBadge}>
               <span className={styles.loadingSpinner}></span>
               <span>Waiting for admin to post announcements</span>
