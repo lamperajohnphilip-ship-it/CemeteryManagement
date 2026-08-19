@@ -25,6 +25,7 @@ export function verifyPassword(password: string, storedPassword: string): boolea
     if (parts.length !== 3) return false;
     const salt = parts[1];
     const originalHash = parts[2];
+    if (!salt || !originalHash) return false;
 
     const derivedKey = crypto.scryptSync(password, salt, 64);
     const keyBuffer = Buffer.from(derivedKey.toString('hex'), 'hex');
