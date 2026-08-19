@@ -1,0 +1,275 @@
+.mainContent {
+  position: relative;
+  z-index: 1;
+  padding-top: 80px;
+  min-height: calc(100vh - 60px);
+}
+
+.aboutHeader {
+  text-align: center;
+  padding: 4rem 2rem 2rem;
+}
+
+.aboutEyebrow {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 1rem;
+  animation: fadeUp 1s 0.3s forwards;
+  opacity: 0;
+}
+
+.aboutTitle {
+  font-family: 'Cinzel', serif;
+  font-size: clamp(2.5rem, 5vw, 3.5rem);
+  color: var(--cream);
+  margin-bottom: 1rem;
+  animation: fadeUp 1s 0.5s forwards;
+  opacity: 0;
+}
+
+.aboutTitle em {
+  color: var(--gold);
+  font-style: normal;
+}
+
+.aboutDivider {
+  width: 80px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  margin: 1.5rem auto;
+  animation: fadeUp 1s 0.7s forwards;
+  opacity: 0;
+}
+
+.aboutDescription {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 2rem 3rem;
+  text-align: center;
+  animation: fadeUp 1s 0.9s forwards;
+  opacity: 0;
+}
+
+.aboutDescription p {
+  font-size: 1.2rem;
+  line-height: 1.8;
+  color: rgba(232,224,208,0.8);
+  margin-bottom: 1.5rem;
+}
+
+.highlight {
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.missionVision {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  max-width: 1000px;
+  margin: 2rem auto;
+  padding: 0 2rem;
+}
+
+.missionCard, .visionCard {
+  background: var(--ash);
+  border: 1px solid rgba(201,168,76,0.15);
+  border-radius: 8px;
+  padding: 2rem;
+  transition: transform 0.3s, border-color 0.3s;
+}
+
+.missionCard:hover, .visionCard:hover {
+  transform: translateY(-5px);
+  border-color: var(--gold);
+}
+
+.cardIcon {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.cardTitle {
+  font-family: 'Cinzel', serif;
+  font-size: 1.5rem;
+  color: var(--gold);
+  margin-bottom: 1rem;
+}
+
+.cardText {
+  font-size: 1rem;
+  line-height: 1.8;
+  color: rgba(232,224,208,0.7);
+}
+
+.featuresSection {
+  max-width: 1200px;
+  margin: 4rem auto;
+  padding: 0 2rem;
+}
+
+.sectionTitle {
+  text-align: center;
+  font-family: 'Cinzel', serif;
+  font-size: 2rem;
+  color: var(--cream);
+  margin-bottom: 2rem;
+}
+
+.sectionTitle span {
+  color: var(--gold);
+}
+
+.featuresGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+}
+
+.featureItem {
+  background: var(--fog);
+  border: 1px solid rgba(201,168,76,0.1);
+  border-radius: 8px;
+  padding: 1.8rem;
+  text-align: center;
+  transition: all 0.3s;
+}
+
+.featureItem:hover {
+  background: var(--ash);
+  border-color: var(--gold);
+}
+
+.featureIcon {
+  font-size: 2.2rem;
+  margin-bottom: 1rem;
+}
+
+.featureTitle {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.9rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 0.8rem;
+}
+
+.featureDesc {
+  font-size: 0.95rem;
+  color: rgba(232,224,208,0.6);
+  line-height: 1.6;
+}
+
+.developersSection {
+  max-width: 1000px;
+  margin: 4rem auto;
+  padding: 2rem;
+  background: var(--fog);
+  border: 1px solid rgba(201,168,76,0.15);
+  border-radius: 12px;
+}
+
+.developersTitle {
+  text-align: center;
+  font-family: 'Cinzel', serif;
+  font-size: 2rem;
+  color: var(--gold);
+  margin-bottom: 2rem;
+}
+
+.developersGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+}
+
+.developerCard {
+  text-align: center;
+  padding: 1.5rem 1rem;
+  background: var(--stone);
+  border: 1px solid rgba(201,168,76,0.1);
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.developerCard:hover {
+  transform: translateY(-5px);
+  border-color: var(--gold);
+  background: var(--ash);
+}
+
+.developerImage {
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--gold);
+  padding: 3px;
+}
+
+.developerImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.developerName {
+  font-family: 'Cinzel', serif;
+  font-size: 1.1rem;
+  color: var(--cream);
+  margin-bottom: 0.3rem;
+}
+
+.developerRole {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  color: var(--gold);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+.developerDesc {
+  font-size: 0.8rem;
+  color: rgba(232,224,208,0.5);
+  line-height: 1.4;
+}
+
+.footer {
+  position: relative; 
+  z-index: 1; 
+  padding: 2rem; 
+  text-align: center;
+  border-top: 1px solid rgba(201,168,76,0.1); 
+  background: rgba(26,24,20,0.4);
+  margin-top: 2rem;
+}
+
+.footerText {
+  font-family: 'DM Mono', monospace; 
+  font-size: 0.58rem; 
+  letter-spacing: 0.1em; 
+  color: rgba(232,224,208,0.25);
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+  .developersGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .developersGrid {
+    grid-template-columns: 1fr;
+  }
+}

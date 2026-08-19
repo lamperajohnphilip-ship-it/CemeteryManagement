@@ -1,0 +1,568 @@
+.announcementsPage {
+  position: relative;
+  z-index: 1;
+  min-height: calc(100vh - 60px);
+  padding-top: 60px;
+  display: flex;
+  flex-direction: column;
+}
+
+.annHeader {
+  padding: 2.5rem 3rem 1.5rem;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.1);
+  background: var(--ash);
+}
+
+.annHeader h1 {
+  font-family: 'Cinzel', serif;
+  font-size: 2rem;
+  font-weight: 400;
+  color: var(--cream);
+  margin-bottom: 0.3rem;
+}
+
+.annHeader h1 span {
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.subhead {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(201, 168, 76, 0.6);
+  margin-bottom: 0.8rem;
+}
+
+.description {
+  font-size: 1.05rem;
+  font-style: italic;
+  color: rgba(232, 224, 208, 0.55);
+  max-width: 700px;
+  line-height: 1.6;
+}
+
+.filterTabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.1);
+  background: var(--stone);
+  padding: 0 3rem;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.filterTabs::-webkit-scrollbar {
+  display: none;
+}
+
+.filterTab {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 1rem 1.4rem;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: rgba(232, 224, 208, 0.4);
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  white-space: nowrap;
+  margin-bottom: -1px;
+}
+
+.filterTab:hover {
+  color: rgba(232, 224, 208, 0.7);
+}
+
+.filterTabActive {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+}
+
+.annBody {
+  flex: 1;
+  padding: 2.5rem 3rem;
+  overflow-y: auto;
+  min-height: 300px;
+}
+
+.announcementCard {
+  background: var(--ash);
+  border: 1px solid rgba(201, 168, 76, 0.15);
+  border-radius: 12px;
+  padding: 1.8rem;
+  margin-bottom: 2rem;
+  transition: all 0.3s;
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.announcementCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.announcementHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.announcementTitle {
+  font-family: 'Cinzel', serif;
+  font-size: 1.4rem;
+  color: var(--gold);
+  margin-bottom: 0.3rem;
+}
+
+.announcementMeta {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.announcementBadge {
+  background: rgba(201, 168, 76, 0.15);
+  border: 1px solid rgba(201, 168, 76, 0.3);
+  border-radius: 30px;
+  padding: 0.3rem 1rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+
+.announcementDate {
+  font-size: 0.85rem;
+  color: rgba(232, 224, 208, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.announcementContent {
+  font-size: 1rem;
+  line-height: 1.8;
+  color: rgba(232, 224, 208, 0.8);
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.1);
+  white-space: pre-wrap;
+}
+
+.reactionBar {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.reactionBtn {
+  background: var(--stone);
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  border-radius: 30px;
+  padding: 0.5rem 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+  color: rgba(232, 224, 208, 0.8);
+}
+
+.reactionBtn:hover {
+  background: rgba(201, 168, 76, 0.15);
+  border-color: var(--gold);
+}
+
+.reactionBtnActive {
+  background: rgba(201, 168, 76, 0.2);
+  border-color: var(--gold);
+}
+
+.reactionIcon {
+  font-size: 1.1rem;
+}
+
+.reactionCount {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.8rem;
+  color: rgba(232, 224, 208, 0.8);
+}
+
+.commentsSection {
+  margin-top: 1rem;
+}
+
+.commentsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.commentsTitle {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--gold);
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.commentCount {
+  background: rgba(201, 168, 76, 0.15);
+  border-radius: 20px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.7rem;
+}
+
+.commentForm {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.commentInputWrapper {
+  flex: 1;
+  position: relative;
+  min-width: 200px;
+}
+
+.commentInput {
+  width: 100%;
+  background: var(--stone);
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  border-radius: 30px;
+  padding: 0.8rem 1.2rem;
+  color: var(--cream);
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 0.95rem;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.commentInput:focus {
+  border-color: var(--gold);
+  background: rgba(26, 24, 20, 0.95);
+}
+
+.commentInput::placeholder {
+  color: rgba(232, 224, 208, 0.3);
+  font-style: italic;
+}
+
+.commentSubmit {
+  background: linear-gradient(135deg, var(--gold), var(--gold-dim));
+  border: none;
+  border-radius: 30px;
+  padding: 0.8rem 2rem;
+  color: var(--stone);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.commentSubmit:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(201, 168, 76, 0.3);
+}
+
+.commentsList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.commentItem {
+  background: var(--stone);
+  border: 1px solid rgba(201, 168, 76, 0.1);
+  border-radius: 8px;
+  padding: 1rem;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.commentHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.commentAuthor {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.commentAvatar {
+  width: 30px;
+  height: 30px;
+  background: rgba(201, 168, 76, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  color: var(--gold);
+}
+
+.commentName {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--cream);
+}
+
+.commentDate {
+  font-size: 0.7rem;
+  color: rgba(232, 224, 208, 0.3);
+}
+
+.commentText {
+  font-size: 0.95rem;
+  color: rgba(232, 224, 208, 0.8);
+  line-height: 1.5;
+  margin-left: 2.5rem;
+}
+
+.commentActions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  margin-left: 2.5rem;
+}
+
+.commentAction {
+  background: transparent;
+  border: none;
+  color: rgba(232, 224, 208, 0.4);
+  font-size: 0.75rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: color 0.2s;
+}
+
+.commentAction:hover {
+  color: var(--gold);
+}
+
+.emptyState {
+  text-align: center;
+  padding: 5rem 2rem;
+  background: var(--ash);
+  border: 1px dashed rgba(201, 168, 76, 0.2);
+  border-radius: 16px;
+  max-width: 600px;
+  margin: 2rem auto;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.8;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.8;
+  }
+}
+
+.emptyState svg {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 1.5rem;
+  opacity: 0.3;
+  stroke: var(--gold);
+}
+
+.emptyState h3 {
+  font-family: 'Cinzel', serif;
+  font-size: 1.8rem;
+  font-weight: 400;
+  color: var(--gold);
+  margin-bottom: 1rem;
+}
+
+.emptyState p {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.9rem;
+  color: rgba(232, 224, 208, 0.4);
+  line-height: 1.8;
+  margin-bottom: 2rem;
+}
+
+.waitingIcon {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.adminBadge {
+  background: rgba(201, 168, 76, 0.1);
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  border-radius: 30px;
+  padding: 0.5rem 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--gold);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.8rem;
+  margin-top: 1rem;
+  cursor: pointer;
+}
+
+.loadingSpinner {
+  display: inline-block;
+  width: 30px;
+  height: 30px;
+  border: 2px solid rgba(201, 168, 76, 0.2);
+  border-radius: 50%;
+  border-top-color: var(--gold);
+  animation: spin 1s ease-in-out infinite;
+  margin-right: 0.5rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.annFooter {
+  border-top: 1px solid rgba(201, 168, 76, 0.08);
+  padding: 1.2rem 3rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--stone);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  color: rgba(232, 224, 208, 0.2);
+}
+
+.footerLinks a {
+  color: rgba(201, 168, 76, 0.5);
+  text-decoration: none;
+  margin-left: 1.5rem;
+  transition: color 0.2s;
+}
+
+.footerLinks a:hover {
+  color: var(--gold);
+}
+
+.toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: var(--gold);
+  color: var(--stone);
+  padding: 0.8rem 1.5rem;
+  border-radius: 30px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.8rem;
+  transform: translateY(100px);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 1000;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.toastShow {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .annHeader {
+    padding: 1.8rem 1.5rem;
+  }
+
+  .filterTabs {
+    padding: 0 1.5rem;
+  }
+
+  .annBody {
+    padding: 2rem 1.5rem;
+  }
+
+  .announcementHeader {
+    flex-direction: column;
+  }
+
+  .commentForm {
+    flex-direction: column;
+  }
+
+  .commentSubmit {
+    width: 100%;
+  }
+
+  .annFooter {
+    padding: 1rem 1.5rem;
+    flex-direction: column;
+    gap: 0.8rem;
+    text-align: center;
+  }
+
+  .footerLinks a {
+    margin: 0 0.8rem;
+  }
+}

@@ -1,0 +1,234 @@
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.2rem 3rem;
+  background: rgba(26,24,20,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(201,168,76,0.15);
+}
+
+.navLogo {
+  font-family: 'Cinzel', serif;
+  font-size: 1.1rem;
+  letter-spacing: 0.2em;
+  color: var(--gold);
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.navLogo svg { width: 22px; height: 22px; }
+
+.menuBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  z-index: 200;
+  position: relative;
+}
+
+.menuBtn span {
+  display: block;
+  width: 22px;
+  height: 1.5px;
+  background: var(--gold);
+  transition: transform 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.2s;
+  transform-origin: center;
+}
+
+.menuBtnOpen span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
+.menuBtnOpen span:nth-child(2) { opacity: 0; }
+.menuBtnOpen span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+
+.sidebarOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 149;
+  background: rgba(10,9,8,0.6);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s;
+}
+
+.sidebarOverlayShow {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 300px;
+  background: var(--ash);
+  border-right: 1px solid rgba(201,168,76,0.18);
+  z-index: 150;
+  transform: translateX(-100%);
+  transition: transform 0.4s cubic-bezier(0.4,0,0.2,1);
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebarOpen {
+  transform: translateX(0);
+}
+
+.sidebarHeader {
+  padding: 1.8rem 2rem 1.2rem;
+  border-bottom: 1px solid rgba(201,168,76,0.12);
+  background: rgba(26,24,20,0.6);
+}
+
+.sidebarBrand {
+  font-family: 'Cinzel', serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.2em;
+  color: var(--gold);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.3rem;
+}
+
+.sidebarBrand svg { width: 18px; height: 18px; }
+
+.sidebarTagline {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(232,224,208,0.3);
+}
+
+.sidebarBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem 0;
+}
+
+.sidebarNavItem {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.85rem 2rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  position: relative;
+  color: inherit;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(232,224,208,0.65);
+  text-decoration: none;
+}
+
+.sidebarNavItem:hover, .sidebarNavItemActive {
+  background: rgba(201,168,76,0.06);
+  color: var(--gold);
+}
+
+.navItemIcon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: rgba(201,168,76,0.5);
+}
+
+.sidebarNavItem:hover .navItemIcon, .sidebarNavItemActive .navItemIcon {
+  color: var(--gold);
+}
+
+.sidebarFooter {
+  padding: 1.5rem 2rem;
+  border-top: 1px solid rgba(201,168,76,0.12);
+  margin-top: auto;
+}
+
+.themeToggleLabel {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(232,224,208,0.3);
+  margin-bottom: 0.6rem;
+}
+
+.themeToggleRow {
+  display: flex;
+  background: rgba(26,24,20,0.4);
+  border: 1px solid rgba(201,168,76,0.15);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.themeToggleBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: rgba(232,224,208,0.5);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.themeToggleBtn:hover {
+  color: var(--gold);
+}
+
+.themeToggleBtnActive {
+  background: var(--gold);
+  color: #1a1814 !important;
+  box-shadow: 0 2px 6px rgba(201,168,76,0.2);
+}
+
+.toggleIcon {
+  width: 13px;
+  height: 13px;
+}
+
+/* Light mode overrides inside Navigation.module.css */
+:global(html[data-theme="light"]) .sidebarFooter {
+  border-top-color: var(--admin-sidebar-border);
+}
+
+:global(html[data-theme="light"]) .themeToggleLabel {
+  color: var(--admin-text-dark);
+}
+
+:global(html[data-theme="light"]) .themeToggleRow {
+  background: var(--admin-input-bg);
+  border-color: var(--admin-input-border);
+}
+
+:global(html[data-theme="light"]) .themeToggleBtn {
+  color: var(--admin-text-muted);
+}
+
+:global(html[data-theme="light"]) .themeToggleBtnActive {
+  background: var(--admin-gold) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 6px rgba(161, 98, 7, 0.2) !important;
+}

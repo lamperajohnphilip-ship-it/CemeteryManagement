@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Admin {
+  id       String @id @default(cuid())
+  email    String @unique
+  password String
+  name     String?
+}
+
+model DeceasedRecord {
+  id               String   @id @default(cuid())
+  REF_NO           String   @unique
+  PAYORS_NAME      String
+  CONTACT_NO       String
+  NAME_OF_DECEASED String
+  ADDRESS          String
+  DATE_OF_BIRTH    DateTime
+  DATE_OF_DEATH    DateTime
+  YEAR             Int
+  TOTAL_DUE        Float
+  PAID             Float
+  BALANCE          Float
+  STATUS           String
+  REMARKS          String?
+  isArchived       Boolean  @default(false)
+  archivedAt       DateTime?
+  archiveReason    String?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("deceased_records")
+}
+
+model Inquiries {
+  id               Int      @id @default(autoincrement())
+  APP_ID           String   @unique
+  FAMILY_NAME      String
+  DECEASED         String?
+  REQUESTED_PLOT   String?
+  BURIAL_DATE      DateTime?
+  TIME             String?
+  CONTACT          String
+  STATUS           String   @default("Pending")
+
+  email            String
+  relationship     String
+  address          String?
+  reason           String
+  notes            String?
+  remarks          String?
+
+  createdAt      DateTime @default(now())
+
+  @@map("inquiries")
+}
+
+model Announcement {
+  id          Int      @id @default(autoincrement())
+  title       String
+  content     String
+  category    String
+  badge       String?
+  visibility  String
+  status      String   @default("active")
+  date        DateTime @default(now())
+  validFrom   String?
+  validUntil  String?
+  views       Int      @default(0)
+
+  reactions   AnnouncementReaction[]
+  comments    AnnouncementComment[]
+
+  @@map("announcements")
+}
+
+model AnnouncementReaction {
+  id             Int          @id @default(autoincrement())
+  type           String       // 'like', 'heart', 'pray'
+  announcementId Int
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+  @@map("announcement_reactions")
+}
+
+model AnnouncementComment {
+  id             Int          @id @default(autoincrement())
+  author         String
+  avatar         String
+  text           String
+  date           DateTime     @default(now())
+  likes          Int          @default(0)
+  
+  announcementId Int
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+  @@map("announcement_comments")
+}

@@ -1,0 +1,40 @@
+[
+  {
+    "id": 1,
+    "title": "All Saints' Day Mass Schedule",
+    "content": "In observance of All Saints' Day, we will have special masses at the cemetery chapel:\n\nNovember 1: 7:00 AM, 10:00 AM, 4:00 PM\nNovember 2: 8:00 AM, 11:00 AM, 5:00 PM\n\nAll are welcome. Please bring your own candles and flowers. Parking will be limited, so we encourage carpooling.",
+    "category": "Event",
+    "badge": "EVENT",
+    "visibility": "Public (Visible to all)",
+    "status": "active",
+    "date": "2025-02-15T10:30:00.000Z",
+    "validFrom": "2025-03-01",
+    "validUntil": "2025-11-03",
+    "views": 171,
+    "reactions": {
+      "like": 24,
+      "heart": 12,
+      "pray": 8
+    },
+    "comments": []
+  },
+  {
+    "id": 2,
+    "title": "Cemetery Maintenance Schedule - March 2025",
+    "content": "Regular maintenance will be conducted on the following dates:\n\nMarch 10-12: Grass cutting and landscaping\nMarch 15: Pathway repairs\nMarch 20: Chapel cleaning\n\nPlease be advised that some areas may be temporarily inaccessible during these times. We apologize for any inconvenience.",
+    "category": "Maintenance",
+    "badge": "NOTICE",
+    "visibility": "Public (Visible to all)",
+    "status": "active",
+    "date": "2025-02-20T08:15:00.000Z",
+    "validFrom": "2025-03-01",
+    "validUntil": "2025-03-30",
+    "views": 104,
+    "reactions": {
+      "like": 15,
+      "heart": 5,
+      "pray": 3
+    },
+    "comments": []
+  }
+]

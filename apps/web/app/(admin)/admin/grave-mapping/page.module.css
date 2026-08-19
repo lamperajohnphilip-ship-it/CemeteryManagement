@@ -1,0 +1,285 @@
+.container {
+  padding: 24px;
+  color: #F0EDE6;
+}
+
+.headerRow {
+  margin-bottom: 24px;
+}
+
+.title h3 {
+  font-family: "Cinzel", serif;
+  color: #C9A84C;
+  font-size: 1.8rem;
+  margin: 0 0 4px 0;
+}
+
+.title p {
+  color: #7A7570;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.mapControls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  background-color: #2F2A26;
+  padding: 16px 20px;
+  border-radius: 6px;
+  border: 1px solid #3F3A36;
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.legendBox {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+}
+
+.boxAvailable {
+  background-color: #4CAF50;
+  border: 1px solid #388E3C;
+}
+
+.boxOccupied {
+  background-color: #F44336;
+  border: 1px solid #D32F2F;
+}
+
+.sectionSelect {
+  padding: 8px 12px;
+  border-radius: 4px;
+  background-color: #1F1A16;
+  border: 1px solid #3F3A36;
+  color: #F0EDE6;
+  outline: none;
+}
+
+.mapGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 10px;
+  background-color: #2F2A26;
+  padding: 20px;
+  border-radius: 6px;
+  border: 1px solid #3F3A36;
+  min-height: 400px;
+}
+
+.plot {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  font-size: 0.8rem;
+  font-weight: 600;
+  position: relative;
+  overflow: hidden;
+}
+
+.plot:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+.plotAvailable {
+  background-color: #2e4c30;
+  border: 1px solid #4CAF50;
+  color: #A5D6A7;
+}
+
+.plotAvailable:hover {
+  background-color: #38613a;
+}
+
+.plotOccupied {
+  background-color: #5c2929;
+  border: 1px solid #F44336;
+  color: #ef9a9a;
+}
+
+.plotOccupied:hover {
+  background-color: #7a3535;
+}
+
+.plotId {
+  margin-bottom: 4px;
+}
+
+.plotIcon {
+  font-size: 1.2rem;
+}
+
+.plotName {
+  font-size: 0.6rem;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 90%;
+  margin-top: 4px;
+}
+
+/* Modals */
+.modal {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modalContent {
+  background: #2F2A26;
+  width: 90%;
+  max-width: 500px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #3F3A36;
+}
+
+.modalHeader {
+  padding: 16px 20px;
+  border-bottom: 1px solid #3F3A36;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modalHeader h3 {
+  margin: 0;
+  color: #C9A84C;
+  font-family: "Cinzel", serif;
+}
+
+.modalClose {
+  cursor: pointer;
+  font-size: 1.5rem;
+  color: #7A7570;
+}
+
+.modalClose:hover {
+  color: #F0EDE6;
+}
+
+.modalBody {
+  padding: 20px;
+}
+
+.formGroup {
+  margin-bottom: 16px;
+}
+
+.formGroup label {
+  display: block;
+  font-size: 0.8rem;
+  margin-bottom: 6px;
+  color: #C9A84C;
+}
+
+.formControl {
+  width: 100%;
+  padding: 10px;
+  background: #1F1A16;
+  border: 1px solid #3F3A36;
+  color: #F0EDE6;
+  border-radius: 4px;
+  outline: none;
+}
+
+.formControl:focus {
+  border-color: #C9A84C;
+}
+
+.modalFooter {
+  padding: 16px 20px;
+  border-top: 1px solid #3F3A36;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.btnOutline {
+  background: transparent;
+  color: #F0EDE6;
+  border: 1px solid #3F3A36;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btnOutline:hover {
+  background: #3F3A36;
+}
+
+.btnGold {
+  background: #C9A84C;
+  color: #1F1A16;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.btnGold:hover {
+  background: #D4B86A;
+}
+
+.btnDanger {
+  background: #F44336;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.btnDanger:hover {
+  background: #D32F2F;
+}
+
+.recordDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detailRow {
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #3F3A36;
+}
+
+.detailLabel {
+  color: #7A7570;
+  font-size: 0.85rem;
+}
+
+.detailValue {
+  color: #F0EDE6;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: right;
+}

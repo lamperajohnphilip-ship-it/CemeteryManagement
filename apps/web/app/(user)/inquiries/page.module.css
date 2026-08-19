@@ -1,0 +1,792 @@
+.pageWrapper {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 700px;
+  padding-top: 60px;
+}
+
+.infoPanel {
+  background: rgba(44, 41, 37, 0.4);
+  border-right: 1px solid rgba(201, 168, 76, 0.1);
+  padding: 2.5rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: calc(100vh - 60px);
+  position: sticky;
+  top: 60px;
+  height: calc(100vh - 60px);
+  overflow-y: auto;
+}
+
+.infoEyebrow {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 1rem;
+}
+
+.infoTitle {
+  font-family: 'Cinzel', serif;
+  font-size: 2rem;
+  color: var(--cream);
+  line-height: 1.2;
+  margin-bottom: 1.2rem;
+}
+
+.infoTitle em {
+  color: var(--gold);
+  font-style: normal;
+}
+
+.infoDesc {
+  font-size: 1rem;
+  font-style: italic;
+  color: rgba(232, 224, 208, 0.45);
+  line-height: 1.6;
+  margin-bottom: 2.2rem;
+}
+
+.infoDivider {
+  width: 50px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--gold), transparent);
+  margin-bottom: 2rem;
+}
+
+.stepsLabel {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(232, 224, 208, 0.3);
+  margin-bottom: 1rem;
+}
+
+.stepItem {
+  display: flex;
+  gap: 0.9rem;
+  margin-bottom: 1.2rem;
+}
+
+.stepNum {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border: 1px solid rgba(201, 168, 76, 0.3);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  color: var(--gold);
+  margin-top: 2px;
+}
+
+.stepTitle {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cream);
+  margin-bottom: 0.15rem;
+}
+
+.stepDesc {
+  font-size: 0.85rem;
+  color: rgba(232, 224, 208, 0.4);
+  line-height: 1.5;
+}
+
+.infoFooter {
+  margin-top: auto;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(201, 168, 76, 0.08);
+}
+
+.infoFooterLabel {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.52rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(232, 224, 208, 0.25);
+  margin-bottom: 0.5rem;
+}
+
+.infoFooterText {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.58rem;
+  color: rgba(201, 168, 76, 0.5);
+  line-height: 1.8;
+}
+
+.formPanel {
+  background: rgba(44, 41, 37, 0.6);
+  backdrop-filter: blur(10px);
+  padding: 3rem 4rem;
+  border-left: 1px solid rgba(201, 168, 76, 0.15);
+  overflow-y: auto;
+  box-shadow: -5px 0 30px rgba(0, 0, 0, 0.3);
+}
+
+.progressWrap {
+  margin-bottom: 2.5rem;
+  background: rgba(26, 24, 20, 0.4);
+  padding: 1.2rem 1.5rem;
+  border-radius: 8px;
+  border: 1px solid rgba(201, 168, 76, 0.1);
+}
+
+.progressHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.8rem;
+}
+
+.progressLabel {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.progressCount {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--gold);
+  background: rgba(201, 168, 76, 0.1);
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(201, 168, 76, 0.2);
+}
+
+.progressTrack {
+  height: 4px;
+  background: rgba(201, 168, 76, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 2px;
+}
+
+.sectionBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 0.8rem;
+  background: rgba(201, 168, 76, 0.08);
+  padding: 0.4rem 1rem 0.4rem 0.4rem;
+  border-radius: 30px;
+  border: 1px solid rgba(201, 168, 76, 0.2);
+}
+
+.sectionBadgeNum {
+  width: 24px;
+  height: 24px;
+  background: rgba(201, 168, 76, 0.2);
+  border: 1px solid var(--gold);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  color: var(--gold);
+}
+
+.sectionHeading {
+  font-family: 'Cinzel', serif;
+  font-size: 1.6rem;
+  color: var(--cream);
+  margin-bottom: 0.3rem;
+}
+
+.sectionSubheading {
+  font-size: 0.95rem;
+  font-style: italic;
+  color: rgba(232, 224, 208, 0.45);
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.15);
+}
+
+.formCard {
+  background: rgba(26, 24, 20, 0.5);
+  border: 1px solid rgba(201, 168, 76, 0.15);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  backdrop-filter: blur(5px);
+}
+
+.formGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.formRow2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.formLabel {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(232, 224, 208, 0.6);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.req {
+  color: var(--gold);
+  font-size: 0.7rem;
+}
+
+.formInput,
+.formSelect,
+.formTextarea {
+  background: rgba(26, 24, 20, 0.8);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  border-radius: 6px;
+  padding: 0.9rem 1rem;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1rem;
+  color: var(--cream);
+  outline: none;
+  transition: all 0.25s;
+  width: 100%;
+}
+
+.formInput:hover,
+.formSelect:hover,
+.formTextarea:hover {
+  border-color: rgba(201, 168, 76, 0.4);
+  background: rgba(26, 24, 20, 0.9);
+}
+
+.formInput:focus,
+.formSelect:focus,
+.formTextarea:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.15);
+  background: rgba(26, 24, 20, 0.95);
+}
+
+.formInput::placeholder,
+.formTextarea::placeholder {
+  color: rgba(232, 224, 208, 0.2);
+  font-style: italic;
+  font-size: 0.95rem;
+}
+
+.formInputErr,
+.formSelectErr,
+.formTextareaErr {
+  border-color: rgba(210, 100, 100, 0.7);
+  background: rgba(210, 100, 100, 0.05);
+}
+
+.errMsg {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  color: rgba(210, 100, 100, 0.9);
+  letter-spacing: 0.05em;
+  padding-left: 0.5rem;
+  margin-top: 0.2rem;
+}
+
+.formHint {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  color: rgba(232, 224, 208, 0.3);
+  letter-spacing: 0.05em;
+  padding-left: 0.5rem;
+}
+
+.formSelect {
+  appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='8' viewBox='0 0 14 8'%3E%3Cpath d='M1 1l6 6 6-6' stroke='%23c9a84c' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  padding-right: 2.5rem;
+}
+
+.formSelect option {
+  background: var(--ash);
+  color: var(--cream);
+  padding: 0.5rem;
+}
+
+.formTextarea {
+  resize: vertical;
+  min-height: 100px;
+  line-height: 1.6;
+}
+
+.reasonGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
+  margin-top: 0.5rem;
+}
+
+.reasonCard {
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  border-radius: 8px;
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.25s;
+  background: rgba(26, 24, 20, 0.5);
+  position: relative;
+  backdrop-filter: blur(5px);
+}
+
+.reasonCard:hover {
+  border-color: rgba(201, 168, 76, 0.5);
+  background: rgba(201, 168, 76, 0.08);
+  transform: translateY(-2px);
+}
+
+.reasonCardSelected {
+  border-color: var(--gold);
+  background: rgba(201, 168, 76, 0.12);
+  box-shadow: 0 4px 12px rgba(201, 168, 76, 0.15);
+}
+
+.reasonCardSelected::after {
+  content: '✓';
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--gold);
+  background: rgba(26, 24, 20, 0.5);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--gold);
+}
+
+.reasonIcon {
+  font-size: 1.4rem;
+  margin-bottom: 0.5rem;
+  color: var(--gold);
+}
+
+.reasonTitle {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cream);
+  line-height: 1.3;
+  margin-bottom: 0.2rem;
+}
+
+.reasonDesc {
+  font-size: 0.7rem;
+  color: rgba(232, 224, 208, 0.45);
+  line-height: 1.4;
+}
+
+.reasonErr {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  color: rgba(210, 100, 100, 0.9);
+  margin-top: 0.3rem;
+}
+
+.consentBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  padding: 1rem 1.2rem;
+  background: rgba(201, 168, 76, 0.06);
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  margin: 1rem 0;
+  transition: all 0.25s;
+}
+
+.consentBox:hover {
+  background: rgba(201, 168, 76, 0.1);
+  border-color: rgba(201, 168, 76, 0.35);
+}
+
+.consentBox input[type=checkbox] {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: var(--gold);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.consentText {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  color: rgba(232, 224, 208, 0.55);
+  line-height: 1.6;
+}
+
+.reviewGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.reviewBlock {
+  background: rgba(26, 24, 20, 0.6);
+  border: 1px solid rgba(201, 168, 76, 0.15);
+  border-radius: 10px;
+  padding: 1.5rem;
+  backdrop-filter: blur(5px);
+}
+
+.reviewBlockTitle {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.15);
+}
+
+.reviewRow {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.8rem;
+  font-size: 0.9rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px dashed rgba(201, 168, 76, 0.1);
+}
+
+.reviewRow:last-child {
+  border-bottom: none;
+}
+
+.reviewKey {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  color: rgba(232, 224, 208, 0.45);
+  text-transform: uppercase;
+  padding-top: 2px;
+}
+
+.reviewVal {
+  color: rgba(232, 224, 208, 0.9);
+  font-size: 0.95rem;
+}
+
+.formNav {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.btnNext,
+.btnSubmit {
+  flex: 1;
+  padding: 1rem 1.2rem;
+  background: linear-gradient(135deg, var(--gold), var(--gold-dim));
+  border: none;
+  border-radius: 6px;
+  color: var(--stone);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.25s;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.btnNext:hover,
+.btnSubmit:hover {
+  background: linear-gradient(135deg, var(--gold-dim), var(--gold));
+  color: var(--cream);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(201, 168, 76, 0.3);
+}
+
+.btnPrev {
+  padding: 1rem 1.5rem;
+  background: transparent;
+  border: 1px solid rgba(201, 168, 76, 0.3);
+  border-radius: 6px;
+  color: rgba(232, 224, 208, 0.6);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.25s;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.btnPrev:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: rgba(201, 168, 76, 0.05);
+}
+
+/* Success Page */
+.successPage {
+  position: relative;
+  z-index: 1;
+  min-height: calc(100vh - 60px);
+  padding-top: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-direction: column;
+  text-align: center;
+  padding: 4rem 2rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.successRing {
+  width: 70px;
+  height: 70px;
+  border: 2px solid rgba(201, 168, 76, 0.3);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.2rem;
+  position: relative;
+  background: rgba(201, 168, 76, 0.03);
+}
+
+.successRing svg {
+  width: 32px;
+  height: 32px;
+  color: var(--gold);
+  stroke-width: 2;
+}
+
+.successTitle {
+  font-family: 'Cinzel', serif;
+  font-size: 2rem;
+  color: var(--cream);
+  margin-bottom: 0.3rem;
+  letter-spacing: 1px;
+}
+
+.successSub {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 1.8rem;
+  opacity: 0.9;
+}
+
+.waitingMessage {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0 0 1.8rem 0;
+  max-width: 100%;
+}
+
+.waitingMessage p {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--bone);
+  opacity: 0.9;
+}
+
+.waitingMessage .highlight {
+  color: var(--gold);
+  font-weight: 500;
+}
+
+.successRef {
+  font-family: 'DM Mono', monospace;
+  font-size: 1.1rem;
+  color: var(--gold);
+  letter-spacing: 1px;
+  padding: 0.6rem 2rem;
+  border: 1px solid rgba(201, 168, 76, 0.3);
+  display: inline-block;
+  margin-bottom: 2rem;
+  background: rgba(26, 24, 20, 0.3);
+  border-radius: 4px;
+}
+
+.successDetails {
+  background: transparent;
+  border: none;
+  padding: 0;
+  max-width: 380px;
+  margin: 0 auto 1.5rem;
+  text-align: left;
+  width: 100%;
+}
+
+.successDetRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.15);
+  font-size: 0.95rem;
+}
+
+.successDetRow:last-child {
+  border-bottom: none;
+}
+
+.successDetKey {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  color: rgba(232, 224, 208, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.successDetVal {
+  color: var(--cream);
+  font-size: 0.95rem;
+  font-weight: 400;
+}
+
+.statusPending {
+  color: var(--gold);
+  font-size: 0.9rem;
+}
+
+.successInfo {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.05em;
+  color: rgba(232, 224, 208, 0.4);
+  line-height: 1.6;
+  margin-bottom: 2rem;
+  max-width: 450px;
+}
+
+.btnHome {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.9rem 2.2rem;
+  background: linear-gradient(135deg, var(--gold), var(--gold-dim));
+  border: none;
+  border-radius: 4px;
+  color: var(--stone);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.25s;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.btnHome:hover {
+  background: linear-gradient(135deg, var(--gold-dim), var(--gold));
+  color: var(--cream);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(201, 168, 76, 0.3);
+}
+
+.spin {
+  animation: spinning 1s linear infinite;
+}
+
+@keyframes spinning {
+  from {
+    transform: rotate(0deg)
+  }
+
+  to {
+    transform: rotate(360deg)
+  }
+}
+
+@media (max-width: 900px) {
+  .pageWrapper {
+    grid-template-columns: 1fr;
+  }
+
+  .infoPanel {
+    position: relative;
+    top: 0;
+    height: auto;
+    min-height: unset;
+    padding: 2rem 1.5rem;
+    border-right: none;
+    border-bottom: 1px solid rgba(201, 168, 76, 0.1);
+  }
+
+  .formPanel {
+    padding: 2rem 1.5rem;
+  }
+
+  .reasonGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .formRow2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .reviewRow {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+  }
+
+  .successDetRow {
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+}
