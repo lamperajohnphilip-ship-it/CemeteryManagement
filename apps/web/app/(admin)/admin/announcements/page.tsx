@@ -42,7 +42,7 @@ export default function AnnouncementsPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formTitle, setFormTitle] = useState('');
   const [formCategory, setFormCategory] = useState('General');
-  const [formVisibility] = useState('Public (Visible to all)');
+  const [formVisibility, setFormVisibility] = useState('Public (Visible to all)');
   const [formContent, setFormContent] = useState('');
   const [formValidFrom, setFormValidFrom] = useState(new Date().toISOString().split('T')[0]);
   const [formValidUntil, setFormValidUntil] = useState('');
@@ -108,8 +108,6 @@ export default function AnnouncementsPage() {
       return;
     }
 
-    // Only include id when editing an existing record.
-    // For new announcements, omit id so the server creates a new entry.
     const payload: any = {
       ...(editingId ? { id: editingId } : {}),
       title: formTitle,
@@ -298,11 +296,13 @@ export default function AnnouncementsPage() {
                 <div className={styles.announcementContent}>
                   {ann.content.length > 200 ? ann.content.substring(0, 200) + '...' : ann.content}
                 </div>
-                  <div className={styles.announcementFooter}>
-                    <div className={styles.announcementStats}>
-                      <span style={{ display: 'flex', alignItems: 'center', marginRight: '10px' }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '4px'}}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg> {ann.views} views</span>
-                    </div>
-                    <div className={styles.announcementActions}>
+                <div className={styles.announcementFooter}>
+                  <div className={styles.announcementStats}>
+                    <span style={{ display: 'flex', alignItems: 'center', marginRight: '10px' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '4px'}}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg> {ann.views} views
+                    </span>
+                  </div>
+                  <div className={styles.announcementActions}>
                     <button className={styles.actionIcon} style={{ display: 'flex', alignItems: 'center' }} onClick={() => handleEdit(ann)}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'4px'}}><path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.839a.5.5 0 0 1-.62-.62l.84-2.871a2 2 0 0 1 .506-.854z"/></svg> Edit
                     </button>
