@@ -60,7 +60,7 @@ export default function PaymentsPage() {
   const [formRemarks, setFormRemarks] = useState('');
   const [formPayor, setFormPayor] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [formDueDate, setFormDueDate] = useState(''); // NEW
+  const [formDueDate, setFormDueDate] = useState('');
 
   // Audit Logs
   const [auditLogs, setAuditLogs] = useState<{ ts: string, user: string, action: string }[]>([]);
@@ -122,7 +122,7 @@ export default function PaymentsPage() {
     }
 
     // Merge DB records into localPayments
-    const localNamesMap = new Map();
+    const localNamesMap = new Map<string, number>();
     localPayments.forEach((p, idx) => localNamesMap.set(p.deceasedName.toLowerCase(), idx));
 
     for (const dbr of dbRecords) {
@@ -130,9 +130,11 @@ export default function PaymentsPage() {
         localPayments.push(dbr);
       } else {
         const idx = localNamesMap.get(dbr.deceasedName.toLowerCase());
-        localPayments[idx].amountDue = dbr.amountDue;
-        if (dbr.amountPaid > localPayments[idx].amountPaid) {
-          localPayments[idx].amountPaid = dbr.amountPaid;
+        if (idx !== undefined && localPayments[idx]) {
+          localPayments[idx].amountDue = dbr.amountDue;
+          if (dbr.amountPaid > localPayments[idx].amountPaid) {
+            localPayments[idx].amountPaid = dbr.amountPaid;
+          }
         }
       }
     }
@@ -235,17 +237,14 @@ export default function PaymentsPage() {
         const related = updatedPaymentsList.filter(p => (p.deceasedName || '').toLowerCase() === deceasedName.toLowerCase());
         const totalPaid = related.reduce((sum, p) => sum + (parseFloat(p.amountPaid as any) || 0), 0);
         const totalDue = related.length > 0 ? Math.max(...related.map(r => parseFloat(r.amountDue as any) || 0)) : inv[idx].totalAmount;
-
         const balance = Math.max(0, totalDue - totalPaid);
         let newStatus = 'pending';
         if (totalDue > 0 && totalPaid >= totalDue) newStatus = 'paid';
         else if (totalPaid > 0) newStatus = 'overdue';
-
         inv[idx].amountPaid = totalPaid;
         inv[idx].totalAmount = totalDue;
         inv[idx].balance = balance;
         inv[idx].paymentStatus = newStatus;
-        
         localStorage.setItem('cemeteryInventory', JSON.stringify(inv));
       }
     } catch(e) {}
@@ -283,6 +282,7 @@ export default function PaymentsPage() {
     }
     const due = parseFloat(formAmountDue);
     const paid = parseFloat(formAmountPaid);
+    const today = new Date().toISOString().split('T')[0] ?? '';
     const newPayment: PaymentRecord = {
       id: Date.now().toString(),
       ref: `PAY-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -296,17 +296,14 @@ export default function PaymentsPage() {
       yearCovered: formYear,
       dueDate: formDueDate,
       remarks: formRemarks,
-      status: paid >= due ? 'paid' : (formDueDate && formDueDate < (new Date().toISOString().split('T')[0] ?? '')) ? 'overdue' : paid > 0 ? 'overdue' : 'pending'
+      status: paid >= due ? 'paid' : (formDueDate && formDueDate < today) ? 'overdue' : paid > 0 ? 'overdue' : 'pending'
     };
     const updatedPayments = [newPayment, ...payments];
     setPayments(updatedPayments);
     localStorage.setItem('cemeteryPayments', JSON.stringify(updatedPayments));
     syncInventoryBalance(newPayment.deceasedName, updatedPayments);
-    
     setAuditLogs([{ ts: new Date().toISOString(), user: 'Admin Jasaan', action: `Recorded payment ${newPayment.orNo} for ${newPayment.deceasedName}` }, ...auditLogs]);
     setShowPaymentModal(false);
-
-    // Reset forms
     setFormOR(''); setFormAmountDue(''); setFormAmountPaid(''); setFormDeceased(''); setFormYear(''); setFormRemarks(''); setFormPayor(''); setFormDueDate('');
   };
 
@@ -325,36 +322,29 @@ export default function PaymentsPage() {
 
   const handleUpdatePayment = () => {
     if (!currentUpdateRecord) return;
-    
     let newDue = parseFloat(editAmountDue);
     let newPaid = parseFloat(editAmountPaid);
-
     if (isNaN(newDue) || newDue < 0) newDue = currentUpdateRecord.amountDue;
     if (isNaN(newPaid) || newPaid < 0) newPaid = currentUpdateRecord.amountPaid;
-
     if (addAmountPaid) {
       const addedAmount = parseFloat(addAmountPaid);
-      if (!isNaN(addedAmount) && addedAmount > 0) {
-        newPaid += addedAmount;
-      }
+      if (!isNaN(addedAmount) && addedAmount > 0) newPaid += addedAmount;
     }
-
+    const today = new Date().toISOString().split('T')[0] ?? '';
     const updatedPayments = payments.map(p => {
       if (p.id === currentUpdateRecord.id) {
         return {
           ...p,
           amountDue: newDue,
           amountPaid: newPaid,
-          status: newPaid >= newDue ? 'paid' : (p.dueDate && p.dueDate < (new Date().toISOString().split('T')[0] ?? '')) ? 'overdue' : newPaid > 0 ? 'overdue' : 'pending'
+          status: newPaid >= newDue ? 'paid' : (p.dueDate && p.dueDate < today) ? 'overdue' : newPaid > 0 ? 'overdue' : 'pending'
         };
       }
       return p;
     });
-
     setPayments(updatedPayments);
     localStorage.setItem('cemeteryPayments', JSON.stringify(updatedPayments));
     syncInventoryBalance(currentUpdateRecord.deceasedName, updatedPayments);
-
     setAuditLogs([{ ts: new Date().toISOString(), user: 'Admin Jasaan', action: `Managed balance for ${currentUpdateRecord.deceasedName} (Due: ₱${newDue}, Paid: ₱${newPaid})` }, ...auditLogs]);
     setShowUpdateModal(false);
     setCurrentUpdateRecord(null);
@@ -365,48 +355,21 @@ export default function PaymentsPage() {
     const seen = new Set();
     for (const p of payments) {
       const key = `${p.deceasedName}-${p.orNo}-${p.amountPaid}-${p.datePaid}-${p.payorName}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        uniqueResult.push(p);
-      }
+      if (!seen.has(key)) { seen.add(key); uniqueResult.push(p); }
     }
-
     let recordsToExport = uniqueResult;
-    if (generateYear !== 'all') {
-      recordsToExport = uniqueResult.filter(p => p.yearCovered === generateYear);
-    }
-
-    if (recordsToExport.length === 0) {
-      alert("No records found for the selected year.");
-      return;
-    }
-
+    if (generateYear !== 'all') recordsToExport = uniqueResult.filter(p => p.yearCovered === generateYear);
+    if (recordsToExport.length === 0) { alert("No records found for the selected year."); return; }
     const headers = ['Ref No', 'Payor Name', 'Deceased Name', 'Year', 'Date Paid', 'OR No', 'Method', 'Amount Due', 'Amount Paid', 'Balance', 'Status'];
-    const rows = recordsToExport.map(p => [
-      p.ref,
-      `"${p.payorName}"`,
-      `"${p.deceasedName}"`,
-      p.yearCovered,
-      p.datePaid,
-      p.orNo,
-      p.method,
-      p.amountDue,
-      p.amountPaid,
-      Math.max(0, p.amountDue - p.amountPaid),
-      p.status.toUpperCase()
-    ]);
-
+    const rows = recordsToExport.map(p => [p.ref, `"${p.payorName}"`, `"${p.deceasedName}"`, p.yearCovered, p.datePaid, p.orNo, p.method, p.amountDue, p.amountPaid, Math.max(0, p.amountDue - p.amountPaid), p.status.toUpperCase()]);
     const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    const fileName = `Payment_Records_${generateYear !== 'all' ? generateYear : 'All_Years'}.csv`;
-    link.setAttribute('download', fileName);
+    link.setAttribute('download', `Payment_Records_${generateYear !== 'all' ? generateYear : 'All_Years'}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
     setAuditLogs([{ ts: new Date().toISOString(), user: 'Admin Jasaan', action: `Generated payment records report for year: ${generateYear}` }, ...auditLogs]);
     setShowGenerateModal(false);
   };
@@ -415,11 +378,8 @@ export default function PaymentsPage() {
     <div style={{ padding: '0 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '40px', marginBottom: '30px' }}>
         <div className={styles.pageHeader} style={{ margin: 0, paddingBottom: 0, borderBottom: 'none' }}>
-          <div>
-            <h3 style={{ margin: 0, paddingBottom: '4px' }}>Payment Records</h3>
-          </div>
+          <div><h3 style={{ margin: 0, paddingBottom: '4px' }}>Payment Records</h3></div>
         </div>
-
         <div style={{ display: 'flex', gap: '15px' }}>
           <button className={styles.btnOutline} style={{ display: 'flex', alignItems: 'center' }} onClick={() => setShowGenerateModal(true)}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'8px'}}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Generate Records
@@ -457,9 +417,7 @@ export default function PaymentsPage() {
           <label>Year</label>
           <select className={styles.filterSelect} value={yearFilter} onChange={e => setYearFilter(e.target.value)}>
             <option value="all">All Years</option>
-            {uniqueYears.map(y => (
-              <option key={y} value={y}>{y}</option>
-            ))}
+            {uniqueYears.map(y => (<option key={y} value={y}>{y}</option>))}
           </select>
         </div>
         <div className={styles.filterGroup}>
@@ -482,7 +440,7 @@ export default function PaymentsPage() {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>REF. NO.</th><th>PAYOR'S NAME</th><th>DECEASED</th><th>YEAR</th><th>DATE PAID</th><th>OR NO.</th>
+                <th>REF. NO.</th><th>PAYOR&apos;S NAME</th><th>DECEASED</th><th>YEAR</th><th>DATE PAID</th><th>OR NO.</th>
                 <th>METHOD</th><th>DUE DATE</th><th>PAID</th><th>BALANCE</th><th>STATUS</th><th>ACTIONS</th>
               </tr>
             </thead>
@@ -542,7 +500,6 @@ export default function PaymentsPage() {
               <span className={styles.modalClose} onClick={() => setShowPaymentModal(false)}>&times;</span>
             </div>
             <div className={styles.modalBody}>
-              {/* Row 1: Deceased Search + OR Number */}
               <div className={styles.formRow}>
                 <div className={styles.formGroup} style={{ position: 'relative' }}>
                   <label>SELECT DECEASED RECORD *</label>
@@ -563,12 +520,7 @@ export default function PaymentsPage() {
                     />
                   </div>
                   {showSuggestions && (
-                    <div style={{
-                      position: 'absolute', top: '100%', left: 0, right: 0,
-                      backgroundColor: 'var(--admin-modal-bg)', border: '1px solid var(--admin-modal-border)',
-                      borderRadius: '8px', zIndex: 100, maxHeight: '200px', overflowY: 'auto',
-                      boxShadow: '0 8px 24px rgba(0,0,0,0.15)', marginTop: '4px'
-                    }}>
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'var(--admin-modal-bg)', border: '1px solid var(--admin-modal-border)', borderRadius: '8px', zIndex: 100, maxHeight: '200px', overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', marginTop: '4px' }}>
                       {deceasedSuggestions.length > 0 ? deceasedSuggestions.map(s => {
                         const bal = calculateBalance(s.deceasedName);
                         return (
@@ -584,7 +536,6 @@ export default function PaymentsPage() {
                               setFormYear(s.yearCovered);
                               setFormPayor(s.payorName);
                               setShowSuggestions(false);
-                              
                               const amt = parseFloat(formAmountPaid) || bal || 0;
                               if (amt >= 1000) {
                                 const years = Math.floor(amt / 1000);
@@ -668,57 +619,30 @@ export default function PaymentsPage() {
               <span className={styles.modalClose} onClick={() => setShowReceiptModal(false)}>&times;</span>
             </div>
             <div className={styles.modalBody} style={{ display: 'flex', justifyContent: 'center', backgroundColor: 'var(--admin-bg)', padding: '24px' }}>
-              <div 
-                className={styles.receiptWrapper} 
-                style={{ 
-                  backgroundColor: '#ffffff', 
-                  color: '#000000', 
-                  padding: '24px 20px', 
-                  width: '100%', 
-                  maxWidth: '360px', 
-                  fontFamily: '"Courier New", Courier, monospace', 
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-                  borderRadius: '4px',
-                  lineHeight: '1.4',
-                  fontSize: '13px'
-                }}
-              >
-                {/* Top double dashed border */}
+              <div className={styles.receiptWrapper} style={{ backgroundColor: '#ffffff', color: '#000000', padding: '24px 20px', width: '100%', maxWidth: '360px', fontFamily: '"Courier New", Courier, monospace', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', borderRadius: '4px', lineHeight: '1.4', fontSize: '13px' }}>
                 <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', height: '3px', margin: '4px 0 12px' }}></div>
-                
-                {/* Header */}
                 <div style={{ textAlign: 'center', margin: '14px 0' }}>
                   <h2 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0', letterSpacing: '2px', fontFamily: 'Arial, sans-serif' }}>RECEIPT</h2>
                 </div>
-
-                {/* Below title double dashed border */}
                 <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', height: '3px', margin: '12px 0 20px' }}></div>
-
-                {/* Items */}
                 <div style={{ margin: '16px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <span style={{ flex: 1, paddingRight: '12px' }}>1x Lot Rent (Yr {currentReceipt.yearCovered})</span>
                     <span style={{ whiteSpace: 'nowrap' }}>₱ {currentReceipt.amountDue.toFixed(2)}</span>
                   </div>
-                  <div style={{ fontSize: '11px', color: '#555555', paddingLeft: '18px', marginTop: '-4px' }}>
-                    Deceased: {currentReceipt.deceasedName}
-                  </div>
-
+                  <div style={{ fontSize: '11px', color: '#555555', paddingLeft: '18px', marginTop: '-4px' }}>Deceased: {currentReceipt.deceasedName}</div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <span style={{ flex: 1, paddingRight: '12px' }}>1x Payor: {currentReceipt.payorName}</span>
                     <span style={{ whiteSpace: 'nowrap' }}>₱ 0.00</span>
                   </div>
-
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <span style={{ flex: 1, paddingRight: '12px' }}>1x OR No: {currentReceipt.orNo || '—'}</span>
                     <span style={{ whiteSpace: 'nowrap' }}>₱ 0.00</span>
                   </div>
-
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <span style={{ flex: 1, paddingRight: '12px' }}>1x Date: {currentReceipt.datePaid || '—'}</span>
                     <span style={{ whiteSpace: 'nowrap' }}>₱ 0.00</span>
                   </div>
-
                   {currentReceipt.remarks && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <span style={{ flex: 1, paddingRight: '12px', fontSize: '11px', color: '#555555' }}>* Remarks: {currentReceipt.remarks}</span>
@@ -726,26 +650,17 @@ export default function PaymentsPage() {
                     </div>
                   )}
                 </div>
-
-                {/* Single dashed divider above total */}
                 <div style={{ borderTop: '1px dashed #000', margin: '20px 0 10px' }}></div>
-
-                {/* Total amount */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px', margin: '8px 0' }}>
                   <span>TOTAL AMOUNT</span>
                   <span>₱ {currentReceipt.amountDue.toFixed(2)}</span>
                 </div>
-
-                {/* Double dashed divider below total */}
                 <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', height: '3px', margin: '10px 0 16px' }}></div>
-
-                {/* Cash & Change / Balance */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', margin: '12px 0' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
                     <span>{currentReceipt.method ? currentReceipt.method.toUpperCase() : 'CASH'}</span>
                     <span>₱ {currentReceipt.amountPaid.toFixed(2)}</span>
                   </div>
-                  
                   {currentReceipt.amountPaid >= currentReceipt.amountDue ? (
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
                       <span>CHANGE</span>
@@ -758,27 +673,15 @@ export default function PaymentsPage() {
                     </div>
                   )}
                 </div>
-
-                {/* Double dashed divider below change */}
                 <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', height: '3px', margin: '16px 0 20px' }}></div>
-
-                {/* Thank You */}
-                <div style={{ textAlign: 'center', margin: '18px 0', fontSize: '16px', fontWeight: 'bold', fontFamily: 'Arial, sans-serif', letterSpacing: '1px' }}>
-                  THANK YOU
-                </div>
-
-                {/* Single dashed divider above barcode */}
+                <div style={{ textAlign: 'center', margin: '18px 0', fontSize: '16px', fontWeight: 'bold', fontFamily: 'Arial, sans-serif', letterSpacing: '1px' }}>THANK YOU</div>
                 <div style={{ borderTop: '1px dashed #000', margin: '20px 0 12px' }}></div>
-
-                {/* Pure CSS Barcode */}
                 <div style={{ display: 'flex', justifyContent: 'center', height: '50px', margin: '16px auto 4px', gap: '2px', width: '200px' }}>
                   {[2,1,3,1,4,2,1,3,2,1,4,1,2,3,1,2,4,1,3,2,1,4,1,2,3,1,2,1,4,2].map((w, idx) => (
                     <div key={idx} style={{ backgroundColor: '#000', width: `${w}px`, height: '100%' }}></div>
                   ))}
                 </div>
-                <div style={{ textAlign: 'center', fontSize: '10px', color: '#555555', letterSpacing: '2px' }}>
-                  {currentReceipt.ref}
-                </div>
+                <div style={{ textAlign: 'center', fontSize: '10px', color: '#555555', letterSpacing: '2px' }}>{currentReceipt.ref}</div>
               </div>
             </div>
             <div className={styles.modalFooter}>
@@ -827,9 +730,7 @@ export default function PaymentsPage() {
                 <label>YEAR</label>
                 <select className={styles.formControl} value={generateYear} onChange={e => setGenerateYear(e.target.value)}>
                   <option value="all">All Years</option>
-                  {uniqueYears.map(y => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
+                  {uniqueYears.map(y => (<option key={y} value={y}>{y}</option>))}
                 </select>
               </div>
             </div>
@@ -858,39 +759,20 @@ export default function PaymentsPage() {
                   </p>
                 </div>
               </div>
-
               <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                   <label>TOTAL AMOUNT DUE (₱)</label>
-                  <input 
-                    type="number" 
-                    className={styles.formControl} 
-                    value={editAmountDue} 
-                    onChange={e => setEditAmountDue(e.target.value)} 
-                  />
+                  <input type="number" className={styles.formControl} value={editAmountDue} onChange={e => setEditAmountDue(e.target.value)} />
                 </div>
                 <div className={styles.formGroup}>
                   <label>TOTAL AMOUNT PAID (₱)</label>
-                  <input 
-                    type="number" 
-                    className={styles.formControl} 
-                    value={editAmountPaid} 
-                    onChange={e => setEditAmountPaid(e.target.value)} 
-                  />
+                  <input type="number" className={styles.formControl} value={editAmountPaid} onChange={e => setEditAmountPaid(e.target.value)} />
                 </div>
               </div>
-              
               <div style={{ padding: '10px 0', color: '#888', fontSize: '14px', textAlign: 'center', fontWeight: 'bold' }}>- OR -</div>
-
               <div className={styles.formGroup}>
                 <label>ADD NEW PAYMENT (₱)</label>
-                <input 
-                  type="number" 
-                  className={styles.formControl} 
-                  value={addAmountPaid} 
-                  onChange={e => setAddAmountPaid(e.target.value)} 
-                  placeholder="e.g. 500"
-                />
+                <input type="number" className={styles.formControl} value={addAmountPaid} onChange={e => setAddAmountPaid(e.target.value)} placeholder="e.g. 500" />
                 <small style={{ color: '#888', display: 'block', marginTop: '6px' }}>This will be added to the total amount paid.</small>
               </div>
             </div>
