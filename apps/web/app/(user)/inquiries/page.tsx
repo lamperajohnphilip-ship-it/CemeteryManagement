@@ -31,6 +31,31 @@ export default function InquiryPage() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [refNum, setRefNum] = useState('');
 
+  // Feedback Modal States
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackHoverRating, setFeedbackHoverRating] = useState(0);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+
+  const quickFeedbackOptions = [
+    '⚡ Fast & Easy',
+    '📱 Smooth Interface',
+    '📋 Clear Information',
+    '⏱️ Convenient Booking',
+    '✨ Great Experience'
+  ];
+
+  const ratingDescriptions: Record<number, string> = {
+    1: '1/5 · Needs Improvement',
+    2: '2/5 · Fair Experience',
+    3: '3/5 · Good System',
+    4: '4/5 · Very Good & Helpful',
+    5: '5/5 · Excellent & Fast!'
+  };
+
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0] || '';
     const dateInput = document.getElementById('f-date') as HTMLInputElement;
@@ -72,59 +97,128 @@ export default function InquiryPage() {
     }
   };
 
-  const goToStep3 = async () => {
+  const goToStep3 = () => {
     if (validateStep2()) {
-      setIsSubmitting(true);
-      
-      const ref = 'APP-' + Date.now().toString().slice(-6);
-      setRefNum(ref);
-
-      try {
-        await submitInquiry({
-          APP_ID: ref,
-          FAMILY_NAME: formData.firstName.trim() + ' ' + formData.lastName.trim(),
-          email: formData.email,
-          CONTACT: formData.phone,
-          relationship: formData.relation,
-          address: formData.address,
-          reason: formData.reason,
-          DECEASED: formData.deceased,
-          REQUESTED_PLOT: formData.plot,
-          BURIAL_DATE: formData.preferredDate,
-          TIME: formData.preferredTime,
-          notes: formData.notes
-        });
-      } catch (e) {
-        console.error("Failed to submit inquiry to db", e);
-      }
-      
-      // Update local notifications so the admin bell icon works
-      const fullName = formData.firstName.trim() + ' ' + formData.lastName.trim();
-      let notifications = [];
-      try {
-        notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
-      } catch (e) {
-        notifications = [];
-      }
-      notifications.push({
-        id: Date.now(),
-        type: 'new_inquiry',
-        message: `New inquiry request from ${fullName}`,
-        ref: ref,
-        read: false,
-        timestamp: new Date().toISOString()
-      });
-      localStorage.setItem('notifications', JSON.stringify(notifications));
-      window.dispatchEvent(new Event('storage'));
-
-      setIsSubmitting(false);
-      setIsSuccess(true);
+      setStep(3);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
+  const handleFinalSubmit = async () => {
+    setIsSubmitting(true);
+    
+    const ref = 'APP-' + Date.now().toString().slice(-6);
+    setRefNum(ref);
+
+    try {
+      await submitInquiry({
+        APP_ID: ref,
+        FAMILY_NAME: formData.firstName.trim() + ' ' + formData.lastName.trim(),
+        email: formData.email,
+        CONTACT: formData.phone,
+        relationship: formData.relation,
+        address: formData.address,
+        reason: formData.reason,
+        DECEASED: formData.deceased,
+        REQUESTED_PLOT: formData.plot,
+        BURIAL_DATE: formData.preferredDate,
+        TIME: formData.preferredTime,
+        notes: formData.notes
+      });
+    } catch (e) {
+      console.error("Failed to submit inquiry to db", e);
+    }
+    
+    // Update local notifications so the admin bell icon works
+    const fullName = formData.firstName.trim() + ' ' + formData.lastName.trim();
+    let notifications = [];
+    try {
+      notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+    } catch (e) {
+      notifications = [];
+    }
+    notifications.push({
+      id: Date.now(),
+      type: 'new_inquiry',
+      message: `New inquiry request from ${fullName}`,
+      ref: ref,
+      read: false,
+      timestamp: new Date().toISOString()
+    });
+    localStorage.setItem('notifications', JSON.stringify(notifications));
+    window.dispatchEvent(new Event('storage'));
+
+    setIsSubmitting(false);
+    setIsSuccess(true);
+    setShowFeedbackModal(true); // Automatically show feedback/rate us modal
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const toggleTag = (tag: string) => {
+    if (selectedTags.includes(tag)) {
+      setSelectedTags(selectedTags.filter(t => t !== tag));
+    } else {
+      setSelectedTags([...selectedTags, tag]);
+    }
+  };
+
+  const handleFeedbackSubmit = async () => {
+    if (feedbackRating === 0) {
+      alert('Please select a star rating.');
+      return;
+    }
+
+    setIsSubmittingFeedback(true);
+
+    const userName = formData.firstName ? `${formData.firstName.trim()} ${formData.lastName.trim()}` : 'Citizen User';
+    const tagText = selectedTags.length > 0 ? `[${selectedTags.join(', ')}] ` : '';
+    const fullComment = `${tagText}${feedbackComment}`.trim() || 'Great service experience!';
+
+    const feedbackPayload = {
+      id: Date.now(),
+      user_id: userName,
+      rating: feedbackRating,
+      comment: fullComment,
+      date: new Date().toISOString()
+    };
+
+    // Save locally for admin reports & dashboard
+    try {
+      const userFeedbacks = JSON.parse(localStorage.getItem('user_feedback') || '[]');
+      userFeedbacks.unshift(feedbackPayload);
+      localStorage.setItem('user_feedback', JSON.stringify(userFeedbacks));
+
+      const adminFeedbacks = JSON.parse(localStorage.getItem('cemeteryFeedback') || '[]');
+      adminFeedbacks.unshift(feedbackPayload);
+      localStorage.setItem('cemeteryFeedback', JSON.stringify(adminFeedbacks));
+      window.dispatchEvent(new Event('storage'));
+    } catch (e) {
+      console.error('Local feedback save error:', e);
+    }
+
+    // Sync to backend
+    try {
+      await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userName,
+          rating: feedbackRating,
+          comment: fullComment
+        })
+      });
+    } catch (err) {
+      console.error('Failed to sync feedback to backend API:', err);
+    }
+
+    setIsSubmittingFeedback(false);
+    setFeedbackSubmitted(true);
+    setShowFeedbackModal(false);
+  };
+
   const fmtDate = formData.preferredDate ? new Date(formData.preferredDate + 'T00:00:00').toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '—';
   const pct = (step / totalSteps) * 100;
+  const currentActiveRating = feedbackHoverRating || feedbackRating;
 
   if (isSuccess) {
     return (
@@ -153,6 +247,37 @@ export default function InquiryPage() {
           <div className={styles.successDetRow}><div className={styles.successDetKey}>STATUS</div><div className={`${styles.successDetVal} ${styles.statusPending}`}>PENDING · Awaiting Admin Confirmation</div></div>
         </div>
 
+        {/* Feedback Section on Success Screen */}
+        <div className={styles.feedbackCard}>
+          {feedbackSubmitted ? (
+            <div className={styles.feedbackCardSubmitted}>
+              <div className={styles.feedbackStarsDisplay}>
+                {'★'.repeat(feedbackRating)}{'☆'.repeat(5 - feedbackRating)}
+              </div>
+              <div className={styles.feedbackCardTitle}>Thank You for Your Feedback!</div>
+              <div className={styles.feedbackSubmittedText}>
+                You rated our booking system {feedbackRating}/5 stars.
+              </div>
+              <p style={{ fontSize: '0.78rem', color: 'rgba(232,224,208,0.5)', margin: '0.3rem 0 0' }}>
+                Your review helps us improve cemetery online services for everyone.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <div className={styles.feedbackCardTitle}>⭐ How was your experience?</div>
+              <div className={styles.feedbackCardSub}>
+                Let us know how the online booking system worked for you!
+              </div>
+              <button
+                className={styles.btnOpenFeedback}
+                onClick={() => setShowFeedbackModal(true)}
+              >
+                ★ Rate Us & Leave Feedback
+              </button>
+            </div>
+          )}
+        </div>
+
         <div className={styles.successInfo}>
           A confirmation will be sent to your email and mobile number.<br />
           The cemetery office will review your request within 1–2 business days.
@@ -164,6 +289,94 @@ export default function InquiryPage() {
           </svg>
           Return to Portal
         </Link>
+
+        {/* Feedback / Rate Us Modal */}
+        {showFeedbackModal && (
+          <div className={styles.feedbackModalOverlay}>
+            <div className={styles.feedbackModal}>
+              <button
+                className={styles.feedbackClose}
+                onClick={() => setShowFeedbackModal(false)}
+                title="Close"
+              >
+                &times;
+              </button>
+
+              <div className={styles.feedbackHeaderIcon}>⭐</div>
+              <div className={styles.feedbackTitle}>Rate Your Experience</div>
+              <div className={styles.feedbackSubtitle}>
+                How did the inquiry filing system work for you today?
+              </div>
+
+              {/* Star Rating */}
+              <div className={styles.starRatingWrap}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    className={`${styles.starButton} ${currentActiveRating >= star ? styles.starFilled : ''}`}
+                    onClick={() => setFeedbackRating(star)}
+                    onMouseEnter={() => setFeedbackHoverRating(star)}
+                    onMouseLeave={() => setFeedbackHoverRating(0)}
+                    title={`${star} Star${star > 1 ? 's' : ''}`}
+                  >
+                    <svg viewBox="0 0 24 24">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                    </svg>
+                  </button>
+                ))}
+              </div>
+
+              {/* Rating Description */}
+              <div className={styles.starRatingLabel}>
+                {ratingDescriptions[currentActiveRating] || 'Select your rating'}
+              </div>
+
+              {/* Quick Tags */}
+              <div className={styles.quickTagsWrap}>
+                {quickFeedbackOptions.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    className={`${styles.quickTag} ${selectedTags.includes(tag) ? styles.quickTagSelected : ''}`}
+                    onClick={() => toggleTag(tag)}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+
+              {/* Comment Box */}
+              <textarea
+                className={styles.feedbackCommentArea}
+                placeholder="Tell us what you liked or how we can improve (optional)…"
+                value={feedbackComment}
+                onChange={(e) => setFeedbackComment(e.target.value)}
+                maxLength={500}
+              />
+
+              {/* Actions */}
+              <div className={styles.feedbackModalActions}>
+                <button
+                  type="button"
+                  className={styles.btnSkipFeedback}
+                  onClick={() => setShowFeedbackModal(false)}
+                  disabled={isSubmittingFeedback}
+                >
+                  Maybe Later
+                </button>
+                <button
+                  type="button"
+                  className={styles.btnSubmitFeedback}
+                  onClick={handleFeedbackSubmit}
+                  disabled={isSubmittingFeedback}
+                >
+                  {isSubmittingFeedback ? 'Submitting…' : '✓ Submit Feedback'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -357,7 +570,7 @@ export default function InquiryPage() {
             <div className={styles.formNav}>
               <button className={styles.btnPrev} onClick={() => setStep(1)} disabled={isSubmitting}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 5l-7 7 7 7" /></svg> Back to Personal Info</button>
               <button className={styles.btnNext} onClick={goToStep3} disabled={isSubmitting}>
-                {isSubmitting ? 'Submitting...' : 'Submit Inquiry'} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+                Continue to Review & Confirm <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
               </button>
             </div>
           </div>
@@ -390,7 +603,7 @@ export default function InquiryPage() {
             </div>
             <div className={styles.formNav}>
               <button className={styles.btnPrev} disabled={isSubmitting} onClick={() => setStep(2)}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 5l-7 7 7 7" /></svg> Back to Inquiry Details</button>
-              <button className={styles.btnSubmit} disabled={isSubmitting}>
+              <button className={styles.btnSubmit} disabled={isSubmitting} onClick={handleFinalSubmit}>
                 {isSubmitting ? (
                   <><svg className={styles.spin} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" /></svg> Submitting…</>
                 ) : (

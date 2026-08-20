@@ -751,6 +751,320 @@
   }
 }
 
+/* ─── Feedback Modal & Cards ─────────────────────────────── */
+
+.feedbackModalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 1.5rem;
+  animation: modalFadeIn 0.3s ease;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.feedbackModal {
+  background: rgba(30, 27, 24, 0.95);
+  border: 1px solid rgba(201, 168, 76, 0.35);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 480px;
+  padding: 2.2rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), 0 0 30px rgba(201, 168, 76, 0.15);
+  position: relative;
+  animation: modalScaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: center;
+}
+
+@keyframes modalScaleUp {
+  from { transform: scale(0.92); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.feedbackClose {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  color: rgba(232, 224, 208, 0.4);
+  cursor: pointer;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.feedbackClose:hover {
+  color: var(--gold);
+}
+
+.feedbackHeaderIcon {
+  font-size: 2.2rem;
+  margin-bottom: 0.6rem;
+  display: inline-block;
+  animation: bounce 1.5s infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.feedbackTitle {
+  font-family: 'Cinzel', serif;
+  font-size: 1.5rem;
+  color: var(--cream);
+  margin-bottom: 0.4rem;
+  letter-spacing: 0.5px;
+}
+
+.feedbackSubtitle {
+  font-size: 0.85rem;
+  color: rgba(232, 224, 208, 0.6);
+  margin-bottom: 1.6rem;
+  line-height: 1.5;
+}
+
+.starRatingWrap {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+
+.starButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.starButton:hover {
+  transform: scale(1.25);
+}
+
+.starButton svg {
+  width: 38px;
+  height: 38px;
+  stroke: var(--gold);
+  stroke-width: 1.5;
+  fill: none;
+  transition: all 0.2s;
+}
+
+.starFilled svg {
+  fill: var(--gold);
+  filter: drop-shadow(0 0 8px rgba(201, 168, 76, 0.6));
+}
+
+.starRatingLabel {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  min-height: 22px;
+  margin-bottom: 1.2rem;
+  font-weight: 500;
+}
+
+.quickTagsWrap {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-bottom: 1.2rem;
+}
+
+.quickTag {
+  background: rgba(26, 24, 20, 0.6);
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  border-radius: 20px;
+  padding: 5px 12px;
+  color: rgba(232, 224, 208, 0.7);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.quickTag:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: rgba(201, 168, 76, 0.08);
+}
+
+.quickTagSelected {
+  background: rgba(201, 168, 76, 0.2) !important;
+  border-color: var(--gold) !important;
+  color: var(--gold) !important;
+  font-weight: 500;
+}
+
+.feedbackCommentArea {
+  width: 100%;
+  min-height: 85px;
+  background: rgba(20, 18, 16, 0.7);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--cream);
+  font-size: 0.85rem;
+  font-family: inherit;
+  resize: vertical;
+  margin-bottom: 1.4rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.feedbackCommentArea:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 12px rgba(201, 168, 76, 0.2);
+}
+
+.feedbackModalActions {
+  display: flex;
+  gap: 0.8rem;
+  justify-content: center;
+}
+
+.btnSubmitFeedback {
+  flex: 1;
+  padding: 0.85rem 1.4rem;
+  background: linear-gradient(135deg, var(--gold), var(--gold-dim));
+  border: none;
+  border-radius: 8px;
+  color: #1a1814;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btnSubmitFeedback:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(201, 168, 76, 0.4);
+}
+
+.btnSubmitFeedback:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnSkipFeedback {
+  padding: 0.85rem 1.2rem;
+  background: transparent;
+  border: 1px solid rgba(232, 224, 208, 0.2);
+  border-radius: 8px;
+  color: rgba(232, 224, 208, 0.6);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btnSkipFeedback:hover {
+  border-color: rgba(232, 224, 208, 0.5);
+  color: var(--cream);
+}
+
+/* Success Screen Feedback Card */
+.feedbackCard {
+  background: rgba(30, 27, 24, 0.7);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  border-radius: 12px;
+  padding: 1.4rem 1.8rem;
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto 2rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.feedbackCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+
+.feedbackCardTitle {
+  font-family: 'Cinzel', serif;
+  font-size: 1.1rem;
+  color: var(--cream);
+  margin-bottom: 0.3rem;
+}
+
+.feedbackCardSub {
+  font-size: 0.82rem;
+  color: rgba(232, 224, 208, 0.55);
+  margin-bottom: 1rem;
+}
+
+.feedbackCardSubmitted {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.feedbackStarsDisplay {
+  color: var(--gold);
+  font-size: 1.3rem;
+  letter-spacing: 2px;
+}
+
+.feedbackSubmittedText {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--gold);
+  letter-spacing: 0.05em;
+}
+
+.btnOpenFeedback {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.4rem;
+  background: rgba(201, 168, 76, 0.12);
+  border: 1px solid rgba(201, 168, 76, 0.35);
+  border-radius: 6px;
+  color: var(--gold);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btnOpenFeedback:hover {
+  background: rgba(201, 168, 76, 0.22);
+  border-color: var(--gold);
+  transform: translateY(-1px);
+}
+
+
 @media (max-width: 900px) {
   .pageWrapper {
     grid-template-columns: 1fr;
