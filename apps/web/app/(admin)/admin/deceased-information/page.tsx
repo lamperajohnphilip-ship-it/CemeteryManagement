@@ -1027,9 +1027,27 @@ export default function DeceasedInventoryPage() {
                 {errors.remarks && <span className={styles.errorText}>{errors.remarks}</span>}
               </div>
             </div>
-            <div className={styles.modalFooter}>
-              <button className={styles.btnOutline} onClick={() => { setShowRecordModal(false); setErrors({}); }}>Cancel</button>
-              <button className={styles.btnGold} onClick={saveRecord}>Save Record</button>
+            <div className={styles.modalFooter} style={{ justifyContent: formState.id ? 'space-between' : 'flex-end' }}>
+              {formState.id && (
+                <button
+                  className={styles.btnDanger}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  onClick={() => {
+                    if (!confirm(`Are you sure you want to delete the record for "${formState.deceased}"? This cannot be undone.`)) return;
+                    const newInv = inventory.filter(r => r.id !== formState.id);
+                    saveInventory(newInv);
+                    setShowRecordModal(false);
+                    setErrors({});
+                  }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                  Delete Record
+                </button>
+              )}
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button className={styles.btnOutline} onClick={() => { setShowRecordModal(false); setErrors({}); }}>Cancel</button>
+                <button className={styles.btnGold} onClick={saveRecord}>Save Record</button>
+              </div>
             </div>
           </div>
         </div>
