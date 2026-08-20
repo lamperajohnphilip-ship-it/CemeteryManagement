@@ -213,9 +213,40 @@ export async function unarchiveDeceasedRecord(id: string) {
     });
     revalidatePath('/admin/inventory');
     revalidatePath('/admin/archive');
+    revalidatePath('/admin/archieve');
     return { success: true };
   } catch (error: any) {
     console.error("Error unarchiving deceased record:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteDeceasedRecord(id: string) {
+  try {
+    await prisma.deceasedRecord.delete({
+      where: { id },
+    });
+    revalidatePath('/admin/inventory');
+    revalidatePath('/admin/archive');
+    revalidatePath('/admin/archieve');
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error deleting deceased record:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteMultipleDeceasedRecords(ids: string[]) {
+  try {
+    await prisma.deceasedRecord.deleteMany({
+      where: { id: { in: ids } },
+    });
+    revalidatePath('/admin/inventory');
+    revalidatePath('/admin/archive');
+    revalidatePath('/admin/archieve');
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error deleting multiple deceased records:", error);
     return { success: false, error: error.message };
   }
 }

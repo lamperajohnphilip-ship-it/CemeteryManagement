@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import styles from './page.module.css';
-import { getArchivedRecords, unarchiveDeceasedRecord } from '../../../actions/deceased';
+import { getArchivedRecords, unarchiveDeceasedRecord, deleteDeceasedRecord, deleteMultipleDeceasedRecords } from '../../../actions/deceased';
 
 interface ArchivedRecord {
   id: string;
@@ -39,8 +39,16 @@ export default function ArchivePage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  
+  // Restore states
   const [restoring, setRestoring] = useState(false);
   const [showRestoreModal, setShowRestoreModal] = useState(false);
+
+  // Delete states
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [singleDeleteRecord, setSingleDeleteRecord] = useState<ArchivedRecord | null>(null);
+
   const [toastMsg, setToastMsg] = useState('');
 
   useEffect(() => {
@@ -92,7 +100,7 @@ export default function ArchivePage() {
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(''), 3000);
+    setTimeout(() => setToastMsg(''), 3500);
   };
 
   const handleRestoreSelected = () => {
@@ -111,6 +119,72 @@ export default function ArchivePage() {
     setRestoring(false);
     setShowRestoreModal(false);
     showToast(`✅ ${count} record(s) restored to Deceased Information.`);
+  };
+
+  const handleDeleteSingle = (record: ArchivedRecord) => {
+    setSingleDeleteRecord(record);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedIds.size === 0) return alert('Select at least one record to delete.');
+    setSingleDeleteRecord(null);
+    setShowDeleteModal(true);
+  };
+
+  const executeDelete = async () => {
+    setDeleting(true);
+
+    try {
+      if (singleDeleteRecord) {
+        // Delete single record
+        await deleteDeceasedRecord(singleDeleteRecord.id);
+
+        // Also clean up local storage if found
+        try {
+          const rawInv = localStorage.getItem('cemeteryInventory');
+          if (rawInv) {
+            const inv = JSON.parse(rawInv);
+            const filteredInv = inv.filter((r: any) => r.id !== singleDeleteRecord.id && (r.deceased || '').toLowerCase() !== singleDeleteRecord.deceased.toLowerCase());
+            localStorage.setItem('cemeteryInventory', JSON.stringify(filteredInv));
+          }
+        } catch (e) {
+          console.error(e);
+        }
+
+        showToast(`🗑️ Record for "${singleDeleteRecord.deceased}" permanently deleted.`);
+      } else {
+        // Bulk delete
+        const idsArray = Array.from(selectedIds);
+        const count = idsArray.length;
+        await deleteMultipleDeceasedRecords(idsArray);
+
+        // Also clean up local storage
+        try {
+          const rawInv = localStorage.getItem('cemeteryInventory');
+          if (rawInv) {
+            const inv = JSON.parse(rawInv);
+            const selectedSet = new Set(idsArray);
+            const filteredInv = inv.filter((r: any) => !selectedSet.has(r.id));
+            localStorage.setItem('cemeteryInventory', JSON.stringify(filteredInv));
+          }
+        } catch (e) {
+          console.error(e);
+        }
+
+        setSelectedIds(new Set());
+        showToast(`🗑️ ${count} record(s) permanently deleted.`);
+      }
+
+      await loadArchived();
+    } catch (e) {
+      console.error("Error during deletion:", e);
+      alert("Failed to delete records. Please try again.");
+    } finally {
+      setDeleting(false);
+      setShowDeleteModal(false);
+      setSingleDeleteRecord(null);
+    }
   };
 
   const toggleSelect = (id: string, checked: boolean) => {
@@ -157,17 +231,33 @@ export default function ArchivePage() {
             placeholder="Search by name, payor, ref, or reason…"
           />
         </div>
-        <button
-          className={`${styles.restoreBtn} ${selectedIds.size === 0 ? styles.restoreBtnDisabled : ''}`}
-          onClick={handleRestoreSelected}
-          disabled={selectedIds.size === 0}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '8px'}}>
-            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-            <path d="M3 3v5h5"/>
-          </svg>
-          Restore Selected ({selectedIds.size})
-        </button>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            className={`${styles.restoreBtn} ${selectedIds.size === 0 ? styles.restoreBtnDisabled : ''}`}
+            onClick={handleRestoreSelected}
+            disabled={selectedIds.size === 0}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '8px'}}>
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+              <path d="M3 3v5h5"/>
+            </svg>
+            Restore Selected ({selectedIds.size})
+          </button>
+          <button
+            className={`${styles.deleteBtn} ${selectedIds.size === 0 ? styles.deleteBtnDisabled : ''}`}
+            onClick={handleDeleteSelected}
+            disabled={selectedIds.size === 0}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '8px'}}>
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6"/>
+              <path d="M14 11v6"/>
+              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>
+            Delete Selected ({selectedIds.size})
+          </button>
+        </div>
       </div>
 
       {/* Table */}
@@ -203,7 +293,7 @@ export default function ArchivePage() {
                   <th className={styles.th}>STATUS</th>
                   <th className={styles.th}>ARCHIVED ON</th>
                   <th className={styles.th}>REASON</th>
-                  <th className={styles.th}>ACTION</th>
+                  <th className={styles.th}>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
@@ -227,13 +317,18 @@ export default function ArchivePage() {
                     <td className={styles.td}>{fmtDate(r.archivedAt)}</td>
                     <td className={styles.td}><span className={styles.reason}>{r.archiveReason || <em style={{color:'#5A5550'}}>—</em>}</span></td>
                     <td className={styles.td}>
-                      <button className={styles.restoreRowBtn} onClick={async () => {
-                        await unarchiveDeceasedRecord(r.id);
-                        await loadArchived();
-                        showToast('✅ Record restored successfully.');
-                      }}>
-                        ↩ Restore
-                      </button>
+                      <div className={styles.actionBtns}>
+                        <button className={styles.restoreRowBtn} onClick={async () => {
+                          await unarchiveDeceasedRecord(r.id);
+                          await loadArchived();
+                          showToast(`✅ "${r.deceased}" restored to Deceased Information.`);
+                        }}>
+                          ↩ Restore
+                        </button>
+                        <button className={styles.deleteRowBtn} onClick={() => handleDeleteSingle(r)}>
+                          🗑 Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -249,7 +344,7 @@ export default function ArchivePage() {
           <div className={styles.modalBox}>
             <div className={styles.modalHeader}>
               <h3>↩ Restore Records</h3>
-              <span className={styles.modalClose} onClick={() => setShowRestoreModal(false)}>×</span>
+              <span className={styles.modalClose} onClick={() => { if (!restoring) setShowRestoreModal(false); }}>×</span>
             </div>
             <div className={styles.modalBody}>
               <p>
@@ -261,6 +356,41 @@ export default function ArchivePage() {
               <button className={styles.cancelBtn} onClick={() => setShowRestoreModal(false)} disabled={restoring}>Cancel</button>
               <button className={styles.confirmRestoreBtn} onClick={executeRestore} disabled={restoring}>
                 {restoring ? 'Restoring…' : '↩ Yes, Restore'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className={styles.modal}>
+          <div className={styles.modalBox}>
+            <div className={styles.modalHeader}>
+              <h3 style={{ color: '#ef9a9a' }}>🗑 Permanently Delete</h3>
+              <span className={styles.modalClose} onClick={() => { if (!deleting) setShowDeleteModal(false); }}>×</span>
+            </div>
+            <div className={styles.modalBody}>
+              {singleDeleteRecord ? (
+                <p>
+                  Are you sure you want to permanently delete the archived record for <strong>{singleDeleteRecord.deceased}</strong> (Ref: <strong>{singleDeleteRecord.ref}</strong>)?
+                </p>
+              ) : (
+                <p>
+                  Are you sure you want to permanently delete <strong>{selectedIds.size}</strong> selected record(s)?
+                </p>
+              )}
+              <div className={styles.warningNote}>
+                <span>⚠️</span>
+                <div>
+                  <strong>Warning:</strong> This action cannot be undone. All data associated with this record will be permanently deleted from the database.
+                </div>
+              </div>
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.cancelBtn} onClick={() => setShowDeleteModal(false)} disabled={deleting}>Cancel</button>
+              <button className={styles.confirmDeleteBtn} onClick={executeDelete} disabled={deleting}>
+                {deleting ? 'Deleting…' : '🗑 Yes, Delete Permanently'}
               </button>
             </div>
           </div>
