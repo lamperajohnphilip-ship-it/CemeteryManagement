@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { submitInquiry } from '../../actions/inquiry';
+import { sendEmailOtp, verifyEmailOtp } from '../../actions/otp';
 import styles from './page.module.css';
 
 export default function InquiryPage() {
@@ -26,10 +27,19 @@ export default function InquiryPage() {
     notes: ''
   });
 
-  const [errors, setErrors] = useState<Record<string, boolean>>({});
+  const [errors, setErrors] = useState<Record<string, boolean | string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [refNum, setRefNum] = useState('');
+
+  // Email Verification States (Anti-Scam & Security)
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [otpMessage, setOtpMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   // Feedback Modal States
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -62,16 +72,96 @@ export default function InquiryPage() {
     if (dateInput) dateInput.min = today;
   }, []);
 
+  // Resend countdown timer
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(prev => prev - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
+
   const handleInputChange = (field: string, value: string | boolean) => {
+    if (field === 'email') {
+      // If user edits email, require re-verification
+      setIsEmailVerified(false);
+      setOtpSent(false);
+      setOtpCode('');
+      setOtpMessage(null);
+    }
     setFormData({ ...formData, [field]: value });
-    setErrors({ ...errors, [field]: false });
+    setErrors({ ...errors, [field]: false, emailNotVerified: false });
+  };
+
+  // --- Email OTP Handlers ---
+  const handleSendOtp = async () => {
+    const email = formData.email.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErrors(prev => ({ ...prev, email: true }));
+      setOtpMessage({ text: 'Please enter a valid Gmail / email address first.', type: 'error' });
+      return;
+    }
+
+    setIsSendingOtp(true);
+    setOtpMessage({ text: 'Sending 6-digit verification code to your Gmail...', type: 'info' });
+
+    try {
+      const fullName = `${formData.firstName} ${formData.lastName}`.trim();
+      const res = await sendEmailOtp(email, fullName);
+
+      if (res.success) {
+        setOtpSent(true);
+        setResendCooldown(60);
+        setOtpMessage({ text: res.message, type: 'success' });
+      } else {
+        setOtpMessage({ text: res.message || 'Failed to send verification code.', type: 'error' });
+      }
+    } catch (e: any) {
+      setOtpMessage({ text: e.message || 'Failed to send verification code.', type: 'error' });
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpCode || otpCode.trim().length < 4) {
+      setOtpMessage({ text: 'Please enter the 6-digit verification code sent to your email.', type: 'error' });
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    setOtpMessage({ text: 'Verifying code...', type: 'info' });
+
+    try {
+      const res = await verifyEmailOtp(formData.email.trim(), otpCode.trim());
+
+      if (res.success) {
+        setIsEmailVerified(true);
+        setOtpSent(false);
+        setOtpMessage({ text: '✅ Email verified successfully! You can now proceed with your inquiry.', type: 'success' });
+        setErrors(prev => ({ ...prev, email: false, emailNotVerified: false }));
+      } else {
+        setOtpMessage({ text: res.message || 'Incorrect verification code. Please try again.', type: 'error' });
+      }
+    } catch (e: any) {
+      setOtpMessage({ text: e.message || 'Verification failed.', type: 'error' });
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  const handleChangeEmail = () => {
+    setIsEmailVerified(false);
+    setOtpSent(false);
+    setOtpCode('');
+    setOtpMessage(null);
   };
 
   const validateStep1 = () => {
-    const newErrors: Record<string, boolean> = {};
+    const newErrors: Record<string, boolean | string> = {};
     if (formData.firstName.trim().length < 2) newErrors.firstName = true;
     if (formData.lastName.trim().length < 2) newErrors.lastName = true;
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) newErrors.email = true;
+    if (!isEmailVerified) newErrors.emailNotVerified = true;
     if (!/^[\d\s\-\+]{7,}$/.test(formData.phone.trim())) newErrors.phone = true;
     if (!formData.relation) newErrors.relation = true;
     if (!formData.smsInfo) newErrors.smsInfo = true;
@@ -81,7 +171,7 @@ export default function InquiryPage() {
   };
 
   const validateStep2 = () => {
-    const newErrors: Record<string, boolean> = {};
+    const newErrors: Record<string, boolean | string> = {};
     if (!formData.reason) newErrors.reason = true;
     if (!formData.preferredDate) newErrors.preferredDate = true;
     if (!formData.preferredTime) newErrors.preferredTime = true;
@@ -114,16 +204,16 @@ export default function InquiryPage() {
       await submitInquiry({
         APP_ID: ref,
         FAMILY_NAME: formData.firstName.trim() + ' ' + formData.lastName.trim(),
-        email: formData.email,
-        CONTACT: formData.phone,
+        email: formData.email.trim(),
+        CONTACT: formData.phone.trim(),
         relationship: formData.relation,
-        address: formData.address,
+        address: formData.address.trim(),
         reason: formData.reason,
-        DECEASED: formData.deceased,
-        REQUESTED_PLOT: formData.plot,
+        DECEASED: formData.deceased.trim(),
+        REQUESTED_PLOT: formData.plot.trim(),
         BURIAL_DATE: formData.preferredDate,
         TIME: formData.preferredTime,
-        notes: formData.notes
+        notes: formData.notes.trim()
       });
     } catch (e) {
       console.error("Failed to submit inquiry to db", e);
@@ -140,7 +230,7 @@ export default function InquiryPage() {
     notifications.push({
       id: Date.now(),
       type: 'new_inquiry',
-      message: `New inquiry request from ${fullName}`,
+      message: `New verified inquiry request from ${fullName}`,
       ref: ref,
       read: false,
       timestamp: new Date().toISOString()
@@ -150,7 +240,7 @@ export default function InquiryPage() {
 
     setIsSubmitting(false);
     setIsSuccess(true);
-    setShowFeedbackModal(true); // Automatically show feedback/rate us modal
+    setShowFeedbackModal(true); // Automatically show feedback modal
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -233,14 +323,16 @@ export default function InquiryPage() {
 
         <div className={styles.waitingMessage}>
           <p><span className={styles.highlight}>Please wait for admin confirmation</span></p>
-          <p style={{ fontSize: '0.9rem', marginTop: '0.3rem' }}>You will receive a notification once your inquiry is confirmed.</p>
+          <p style={{ fontSize: '0.9rem', marginTop: '0.3rem' }}>
+            A confirmation receipt has been sent to your verified email: <strong>{formData.email}</strong>.
+          </p>
         </div>
 
         <div className={styles.successRef}>{refNum}</div>
 
         <div className={styles.successDetails}>
           <div className={styles.successDetRow}><div className={styles.successDetKey}>NAME</div><div className={styles.successDetVal}>{formData.firstName + ' ' + formData.lastName}</div></div>
-          <div className={styles.successDetRow}><div className={styles.successDetKey}>EMAIL</div><div className={styles.successDetVal}>{formData.email}</div></div>
+          <div className={styles.successDetRow}><div className={styles.successDetKey}>EMAIL</div><div className={styles.successDetVal}>{formData.email} (✓ Verified)</div></div>
           <div className={styles.successDetRow}><div className={styles.successDetKey}>REASON</div><div className={styles.successDetVal}>{formData.reason}</div></div>
           <div className={styles.successDetRow}><div className={styles.successDetKey}>DATE</div><div className={styles.successDetVal}>{fmtDate}</div></div>
           <div className={styles.successDetRow}><div className={styles.successDetKey}>TIME</div><div className={styles.successDetVal}>{formData.preferredTime}</div></div>
@@ -393,8 +485,8 @@ export default function InquiryPage() {
           <div className={styles.stepItem}>
             <div className={styles.stepNum}>1</div>
             <div>
-              <div className={styles.stepTitle}>PERSONAL DETAILS</div>
-              <div className={styles.stepDesc}>Provide your name, contact number, and email.</div>
+              <div className={styles.stepTitle}>PERSONAL & EMAIL VERIFICATION</div>
+              <div className={styles.stepDesc}>Provide your details and verify your Gmail address with a secure code.</div>
             </div>
           </div>
           <div className={styles.stepItem}>
@@ -415,7 +507,7 @@ export default function InquiryPage() {
             <div className={styles.stepNum}>✓</div>
             <div>
               <div className={styles.stepTitle}>WAIT FOR CONFIRMATION</div>
-              <div className={styles.stepDesc}>Admin will review and confirm your inquiry.</div>
+              <div className={styles.stepDesc}>Admin will review and approve your inquiry.</div>
             </div>
           </div>
         </div>
@@ -444,7 +536,7 @@ export default function InquiryPage() {
           <div>
             <div className={styles.sectionBadge}><div className={styles.sectionBadgeNum}>1</div> PERSONAL INFORMATION</div>
             <div className={styles.sectionHeading}>Your Details</div>
-            <div className={styles.sectionSubheading}>Tell us who you are so we can follow up on your inquiry.</div>
+            <div className={styles.sectionSubheading}>Provide your verified details so the cemetery office can send your booking confirmation.</div>
             <div className={styles.formCard}>
               <div className={styles.formGrid}>
                 <div className={styles.formRow2}>
@@ -459,11 +551,102 @@ export default function InquiryPage() {
                     {errors.lastName && <div className={styles.errMsg} style={{ display: 'block' }}>Please enter your last name.</div>}
                   </div>
                 </div>
+
+                {/* Email Address with Anti-Scam Security Verification */}
                 <div className={styles.formGroup}>
-                  <label className={styles.formLabel}>Email Address <span className={styles.req}>*</span></label>
-                  <input className={`${styles.formInput} ${errors.email ? styles.formInputErr : ''}`} type="email" placeholder="e.g. juan@email.com" value={formData.email} onChange={e => handleInputChange('email', e.target.value)} />
+                  <label className={styles.formLabel}>
+                    Email Address (Gmail / Personal Email) <span className={styles.req}>*</span>
+                    {isEmailVerified && <span style={{ color: '#86efac', marginLeft: 'auto', fontWeight: 'bold' }}>✓ Verified</span>}
+                  </label>
+                  
+                  <div className={styles.emailInputWrap}>
+                    <input
+                      className={`${styles.formInput} ${errors.email || errors.emailNotVerified ? styles.formInputErr : ''}`}
+                      type="email"
+                      placeholder="e.g. juan@gmail.com"
+                      value={formData.email}
+                      onChange={e => handleInputChange('email', e.target.value)}
+                      disabled={isEmailVerified}
+                    />
+
+                    {!isEmailVerified ? (
+                      <button
+                        type="button"
+                        className={styles.btnSendOtp}
+                        onClick={handleSendOtp}
+                        disabled={isSendingOtp || !formData.email || resendCooldown > 0}
+                      >
+                        {isSendingOtp ? 'Sending…' : resendCooldown > 0 ? `Wait (${resendCooldown}s)` : 'Verify Email'}
+                      </button>
+                    ) : (
+                      <div className={styles.emailVerifiedBadge}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        Verified
+                      </div>
+                    )}
+                  </div>
+
+                  {isEmailVerified && (
+                    <button type="button" className={styles.btnChangeEmail} onClick={handleChangeEmail}>
+                      Use a different email address
+                    </button>
+                  )}
+
+                  {/* OTP Verification Box */}
+                  {!isEmailVerified && otpSent && (
+                    <div className={styles.otpVerificationBox}>
+                      <div className={styles.otpBoxHeader}>
+                        <span>✉️ Enter 6-Digit Code Sent to {formData.email}</span>
+                      </div>
+                      
+                      <div className={styles.otpInputsRow}>
+                        <input
+                          className={styles.otpInput}
+                          type="text"
+                          maxLength={6}
+                          placeholder="123456"
+                          value={otpCode}
+                          onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                        />
+                        <button
+                          type="button"
+                          className={styles.btnVerifyOtp}
+                          onClick={handleVerifyOtp}
+                          disabled={isVerifyingOtp || otpCode.length < 4}
+                        >
+                          {isVerifyingOtp ? 'Checking…' : 'Confirm Code'}
+                        </button>
+                      </div>
+
+                      {otpMessage && (
+                        <div className={`${styles.otpStatusMsg} ${otpMessage.type === 'success' ? styles.otpStatusSuccess : otpMessage.type === 'error' ? styles.otpStatusError : styles.otpStatusInfo}`}>
+                          {otpMessage.text}
+                        </div>
+                      )}
+
+                      <div className={styles.otpResendText}>
+                        <span>Didn't receive code? Check spam folder.</span>
+                        {resendCooldown > 0 ? (
+                          <span>Resend in {resendCooldown}s</span>
+                        ) : (
+                          <button type="button" className={styles.btnResendCode} onClick={handleSendOtp} disabled={isSendingOtp}>
+                            Resend Code
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {errors.email && <div className={styles.errMsg} style={{ display: 'block' }}>Please enter a valid email address.</div>}
+                  {errors.emailNotVerified && !isEmailVerified && (
+                    <div className={styles.errMsg} style={{ display: 'block', color: '#f87171' }}>
+                      ⚠️ Please click <strong>"Verify Email"</strong> and enter the 6-digit code to protect against fake/scam submissions.
+                    </div>
+                  )}
                 </div>
+
                 <div className={styles.formRow2}>
                   <div className={styles.formGroup}>
                     <label className={styles.formLabel}>Contact Number <span className={styles.req}>*</span></label>
@@ -491,9 +674,9 @@ export default function InquiryPage() {
                 </div>
                 <label className={styles.consentBox}>
                   <input type="checkbox" checked={formData.smsInfo} onChange={e => handleInputChange('smsInfo', e.target.checked)} />
-                  <span className={styles.consentText}>I agree to receive SMS notifications regarding my inquiry status... <span className={styles.req}>*</span></span>
+                  <span className={styles.consentText}>I agree to receive SMS and Email notifications regarding my inquiry status... <span className={styles.req}>*</span></span>
                 </label>
-                {errors.smsInfo && <div className={styles.errMsg} style={{ display: 'block' }}>You must agree to receive SMS notifications.</div>}
+                {errors.smsInfo && <div className={styles.errMsg} style={{ display: 'block' }}>You must agree to receive notifications.</div>}
               </div>
             </div>
             <div className={styles.formNav}>
@@ -585,11 +768,11 @@ export default function InquiryPage() {
               <div className={styles.reviewBlock}>
                 <div className={styles.reviewBlockTitle}>PERSONAL INFORMATION</div>
                 <div className={styles.reviewRow}><div className={styles.reviewKey}>Full Name</div><div className={styles.reviewVal}>{formData.firstName} {formData.lastName}</div></div>
-                <div className={styles.reviewRow}><div className={styles.reviewKey}>Email</div><div className={styles.reviewVal}>{formData.email}</div></div>
+                <div className={styles.reviewRow}><div className={styles.reviewKey}>Email</div><div className={styles.reviewVal}>{formData.email} <span style={{ color: '#86efac', fontSize: '0.75rem' }}>(✓ Verified)</span></div></div>
                 <div className={styles.reviewRow}><div className={styles.reviewKey}>Contact</div><div className={styles.reviewVal}>{formData.phone}</div></div>
                 <div className={styles.reviewRow}><div className={styles.reviewKey}>Relationship</div><div className={styles.reviewVal}>{formData.relation}</div></div>
                 <div className={styles.reviewRow}><div className={styles.reviewKey}>Address</div><div className={styles.reviewVal}>{formData.address || 'Not provided'}</div></div>
-                <div className={styles.reviewRow}><div className={styles.reviewKey}>SMS Alerts</div><div className={styles.reviewVal}>{formData.smsInfo ? 'Yes' : 'No'}</div></div>
+                <div className={styles.reviewRow}><div className={styles.reviewKey}>Notifications</div><div className={styles.reviewVal}>Email & SMS Verified</div></div>
               </div>
               <div className={styles.reviewBlock}>
                 <div className={styles.reviewBlockTitle}>INQUIRY DETAILS</div>

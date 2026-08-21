@@ -284,6 +284,189 @@
   width: 100%;
 }
 
+/* ─── Email Verification Security Styles ──────────────────── */
+
+.emailInputWrap {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btnSendOtp {
+  background: rgba(201, 168, 76, 0.15);
+  border: 1px solid var(--gold);
+  border-radius: 6px;
+  padding: 0.85rem 1.1rem;
+  color: var(--gold);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.btnSendOtp:hover:not(:disabled) {
+  background: var(--gold);
+  color: #1a1814;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(201, 168, 76, 0.3);
+}
+
+.btnSendOtp:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.emailVerifiedBadge {
+  background: rgba(46, 125, 50, 0.2);
+  border: 1px solid rgba(74, 222, 128, 0.5);
+  border-radius: 6px;
+  padding: 0.85rem 1rem;
+  color: #86efac;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.btnChangeEmail {
+  background: transparent;
+  border: none;
+  color: rgba(232, 224, 208, 0.5);
+  font-size: 0.7rem;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  margin-top: 4px;
+  align-self: flex-start;
+  transition: color 0.2s;
+}
+
+.btnChangeEmail:hover {
+  color: var(--gold);
+}
+
+.otpVerificationBox {
+  background: rgba(36, 32, 26, 0.85);
+  border: 1px solid rgba(201, 168, 76, 0.35);
+  border-radius: 8px;
+  padding: 1rem 1.2rem;
+  margin-top: 0.6rem;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.otpBoxHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.6rem;
+}
+
+.otpInputsRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.otpInput {
+  flex: 1;
+  background: rgba(20, 18, 16, 0.9);
+  border: 1px solid rgba(201, 168, 76, 0.4);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  font-family: monospace, Consolas, sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 6px;
+  color: var(--cream);
+  text-align: center;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.otpInput:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 10px rgba(201, 168, 76, 0.3);
+}
+
+.btnVerifyOtp {
+  background: linear-gradient(135deg, var(--gold), var(--gold-dim));
+  border: none;
+  border-radius: 6px;
+  padding: 0.75rem 1.2rem;
+  color: #1a1814;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.btnVerifyOtp:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(201, 168, 76, 0.4);
+}
+
+.btnVerifyOtp:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.otpStatusMsg {
+  font-size: 0.75rem;
+  margin-top: 0.5rem;
+  line-height: 1.4;
+}
+
+.otpStatusSuccess {
+  color: #86efac;
+}
+
+.otpStatusError {
+  color: #f87171;
+}
+
+.otpStatusInfo {
+  color: rgba(232, 224, 208, 0.7);
+}
+
+.otpResendText {
+  font-size: 0.7rem;
+  color: rgba(232, 224, 208, 0.5);
+  margin-top: 0.4rem;
+  display: flex;
+  justify-content: space-between;
+}
+
+.btnResendCode {
+  background: none;
+  border: none;
+  color: var(--gold);
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  font-size: 0.7rem;
+}
+
 .formInput:hover,
 .formSelect:hover,
 .formTextarea:hover {

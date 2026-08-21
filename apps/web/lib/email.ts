@@ -63,6 +63,113 @@ function createTransporter() {
 }
 
 /**
+ * Sends a 6-digit security verification code (OTP) to the user's Gmail address to verify ownership.
+ */
+export async function sendVerificationOtpEmail(
+  recipientEmail: string,
+  otpCode: string,
+  recipientName?: string
+): Promise<{ success: boolean; messageId?: string; error?: string; unconfigured?: boolean }> {
+  try {
+    if (!recipientEmail || !recipientEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim())) {
+      return { success: false, error: 'Invalid recipient email address' };
+    }
+
+    const transporter = createTransporter();
+    if (!transporter) {
+      console.warn('[Email OTP] Email credentials not configured. In dev mode OTP is:', otpCode);
+      return {
+        success: false,
+        unconfigured: true,
+        error: 'Email service credentials not configured. Please set EMAIL_USER and EMAIL_APP_PASSWORD.',
+      };
+    }
+
+    const senderEmail = process.env.EMAIL_USER;
+    const fromHeader = process.env.EMAIL_FROM || `"Municipality of Jasaan Cemetery Management System" <${senderEmail}>`;
+    const displayName = recipientName ? escapeHtml(recipientName) : 'Applicant';
+    const safeOtp = escapeHtml(otpCode);
+
+    const textContent = `Dear ${recipientName || 'Applicant'},
+
+Your 6-digit verification code for the Municipality of Jasaan Cemetery Inquiry Form is:
+
+${otpCode}
+
+This code will expire in 10 minutes. Please enter this code on the inquiry form to verify your email address.
+
+If you did not request this verification code, please ignore this email.
+
+Thank you,
+Municipality of Jasaan Cemetery Management System
+`;
+
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Verify Your Email Address</title></head>
+<body style="margin: 0; padding: 0; background-color: #12100e; font-family: 'Segoe UI', Roboto, sans-serif; color: #e8e0d0; line-height: 1.6;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #12100e; padding: 30px 10px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width: 540px; background-color: #1c1916; border: 1px solid #c8a84b; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.6);" cellspacing="0" cellpadding="0" border="0">
+          <tr>
+            <td style="background: linear-gradient(135deg, #2a241c 0%, #171410 100%); padding: 28px 24px; text-align: center; border-bottom: 2px solid #c8a84b;">
+              <div style="font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: #c8a84b; margin-bottom: 6px; font-weight: 600;">MUNICIPALITY OF JASAAN · CEMETERY OFFICE</div>
+              <h1 style="margin: 0; color: #f5eedc; font-size: 20px;">Email Verification Code</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 30px 24px; text-align: center;">
+              <p style="margin: 0 0 14px 0; font-size: 15px; color: #f5eedc; text-align: left;">Dear <strong>${displayName}</strong>,</p>
+              <p style="margin: 0 0 24px 0; font-size: 14px; color: #d0c8b8; text-align: left;">
+                Please use the following 6-digit verification code to confirm your email address and submit your cemetery inquiry.
+              </p>
+
+              <!-- OTP Code Box -->
+              <div style="background-color: #24201a; border: 2px dashed #c8a84b; border-radius: 10px; padding: 20px; margin: 0 auto 24px; max-width: 280px; text-align: center;">
+                <div style="font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #a09888; margin-bottom: 6px;">YOUR VERIFICATION CODE</div>
+                <div style="font-family: monospace, Consolas, sans-serif; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #e2c97e;">
+                  ${safeOtp}
+                </div>
+                <div style="font-size: 11px; color: #a09888; margin-top: 8px;">⏳ Expires in 10 minutes</div>
+              </div>
+
+              <p style="margin: 0 0 16px 0; font-size: 13px; color: #9c9588; text-align: left;">
+                To protect against scams and spam, inquiries require a verified email address. Never share this code with anyone.
+              </p>
+
+              <div style="border-top: 1px dashed rgba(200, 168, 75, 0.2); margin: 20px 0 16px 0;"></div>
+
+              <p style="margin: 0; font-size: 12px; color: #7a7366; text-align: left;">
+                Municipality of Jasaan Cemetery Management System · Jasaan, Misamis Oriental
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+
+    const info = await transporter.sendMail({
+      from: fromHeader,
+      to: recipientEmail.trim(),
+      subject: `Your Cemetery Inquiry Verification Code: ${otpCode}`,
+      text: textContent,
+      html: htmlContent,
+    });
+
+    return { success: true, messageId: info.messageId };
+  } catch (error: any) {
+    console.error('[Email Service Error - OTP]', error);
+    return { success: false, error: error?.message || 'Failed to send OTP email' };
+  }
+}
+
+/**
  * Sends an immediate submission receipt email when the user files an inquiry.
  */
 export async function sendInquiryReceivedEmail(
