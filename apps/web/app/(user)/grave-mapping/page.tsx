@@ -8,6 +8,27 @@ export default function MappingPage() {
   const initialized = useRef(false);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).openView = (window as any).openView || function(key: string) {
+        if ((window as any)._realOpenView) (window as any)._realOpenView(key);
+      };
+      (window as any).closeView = (window as any).closeView || function() {
+        if ((window as any)._realCloseView) (window as any)._realCloseView();
+      };
+      (window as any).setCamera = (window as any).setCamera || function(cam: any, btn: any) {
+        if ((window as any)._realSetCamera) (window as any)._realSetCamera(cam, btn);
+      };
+      (window as any).toggleLayer = (window as any).toggleLayer || function(layer: any, btn: any) {
+        if ((window as any)._realToggleLayer) (window as any)._realToggleLayer(layer, btn);
+      };
+      (window as any).closeGravePopup = (window as any).closeGravePopup || function() {
+        if ((window as any)._realCloseGravePopup) (window as any)._realCloseGravePopup();
+      };
+      (window as any).showGravePopup = (window as any).showGravePopup || function(plot: any) {
+        if ((window as any)._realShowGravePopup) (window as any)._realShowGravePopup(plot);
+      };
+    }
+
     const timer = setInterval(() => {
       if (typeof window !== 'undefined' && (window as any).initMapping && !initialized.current) {
         (window as any).initMapping();
@@ -34,7 +55,7 @@ export default function MappingPage() {
     <div class="nav-title">Mapping</div>
   </div>
   <!-- BACK TO PORTAL BUTTON -->
-  <a class="nav-back" href="cemetery-management.html">
+  <a class="nav-back" href="/">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
     Back to Portal
   </a>

@@ -912,12 +912,17 @@ window.initMapping = () => {
     setTimeout(()=>{ openView('public'); },400);
   }
 };
-// Make global functions explicit
-
 window.openView = openView;
+window._realOpenView = openView;
 window.closeView = closeView;
+window._realCloseView = closeView;
 window.setCamera = setCamera;
+window._realSetCamera = setCamera;
 window.toggleLayer = toggleLayer;
+window._realToggleLayer = toggleLayer;
 window.flyToTarget = flyToTarget;
+window._realFlyToTarget = flyToTarget;
 window.showGravePopup = showGravePopup;
+window._realShowGravePopup = showGravePopup;
 window.closeGravePopup = closeGravePopup;
+window._realCloseGravePopup = closeGravePopup;
