@@ -31,17 +31,29 @@ export interface GravePlotWithDeceased {
   } | null;
 }
 
+// ── Plot Number Normalizer Helper (e.g. "A-001" or "a1" -> "A-1") ──
+function normalizePlotNumber(input: string): string {
+  if (!input) return '';
+  const clean = input.trim();
+  const match = clean.match(/([A-Ca-c])\s*[-–_]?\s*0*(\d+)/i);
+  if (match) {
+    const sec = match[1]!.toUpperCase();
+    const num = parseInt(match[2]!, 10);
+    return `${sec}-${num}`;
+  }
+  return clean.toUpperCase();
+}
+
 // ── Auto-seed 247 default plots if empty ────────────────────
 async function seedDefaultPlots() {
   const plotsToCreate: any[] = [];
 
-  // Section A: 80 plots (8 rows x 10 cols)
+  // Section A: 80 plots (8 rows x 10 cols) -> A-1 to A-80
   for (let r = 1; r <= 8; r++) {
     for (let c = 1; c <= 10; c++) {
       const idx = (r - 1) * 10 + c;
-      const numStr = String(idx).padStart(3, '0');
       plotsToCreate.push({
-        plotNumber: `A-${numStr}`,
+        plotNumber: `A-${idx}`,
         section: 'A',
         row: r,
         column: c,
@@ -52,13 +64,12 @@ async function seedDefaultPlots() {
     }
   }
 
-  // Section B: 80 plots (8 rows x 10 cols)
+  // Section B: 80 plots (8 rows x 10 cols) -> B-1 to B-80
   for (let r = 1; r <= 8; r++) {
     for (let c = 1; c <= 10; c++) {
       const idx = (r - 1) * 10 + c;
-      const numStr = String(idx).padStart(3, '0');
       plotsToCreate.push({
-        plotNumber: `B-${numStr}`,
+        plotNumber: `B-${idx}`,
         section: 'B',
         row: r,
         column: c,
@@ -69,15 +80,14 @@ async function seedDefaultPlots() {
     }
   }
 
-  // Section C: 87 plots (8 rows x 11 cols, minus 1)
+  // Section C: 87 plots (8 rows x 11 cols, minus 1) -> C-1 to C-87
   let cCount = 0;
   for (let r = 1; r <= 8; r++) {
     for (let c = 1; c <= 11; c++) {
       cCount++;
       if (cCount > 87) break;
-      const numStr = String(cCount).padStart(3, '0');
       plotsToCreate.push({
-        plotNumber: `C-${numStr}`,
+        plotNumber: `C-${cCount}`,
         section: 'C',
         row: r,
         column: c,
@@ -100,16 +110,8 @@ async function seedDefaultPlots() {
 
   for (const d of existingDeceased) {
     if (!d.REMARKS) continue;
-    // Look for plot codes like "A-012", "Section A - Plot 12", "B-005"
-    let match = d.REMARKS.match(/([A-Ca-c])\s*[-–]?\s*0*(\d+)/i);
-    if (!match) {
-      match = d.REMARKS.match(/Section\s*([A-Ca-c]).*?Plot\s*0*(\d+)/i);
-    }
-    if (match) {
-      const sec = match[1]?.toUpperCase() ?? 'A';
-      const num = String(parseInt(match[2] ?? '1', 10)).padStart(3, '0');
-      const targetPlot = `${sec}-${num}`;
-      
+    const targetPlot = normalizePlotNumber(d.REMARKS);
+    if (targetPlot) {
       const plot = await prisma.gravePlot.findUnique({ where: { plotNumber: targetPlot } });
       if (plot && !plot.deceasedId) {
         await prisma.gravePlot.update({
@@ -130,6 +132,27 @@ export async function getGraveMapData() {
     const totalCount = await prisma.gravePlot.count();
     if (totalCount === 0) {
       await seedDefaultPlots();
+    } else {
+      // Check if old 3-digit padded plots (e.g. "A-001") exist and migrate them to clean "A-1"
+      const samplePadded = await prisma.gravePlot.findFirst({
+        where: { plotNumber: { contains: '-0' } }
+      });
+      if (samplePadded) {
+        const allPlots = await prisma.gravePlot.findMany();
+        for (const p of allPlots) {
+          const norm = normalizePlotNumber(p.plotNumber);
+          if (norm !== p.plotNumber) {
+            try {
+              await prisma.gravePlot.update({
+                where: { id: p.id },
+                data: { plotNumber: norm }
+              });
+            } catch (err) {
+              // Ignore unique conflicts during batch rename
+            }
+          }
+        }
+      }
     }
 
     const plots = await prisma.gravePlot.findMany({
@@ -157,7 +180,9 @@ export async function assignDeceasedToGrave(data: {
   notes?: string;
 }) {
   try {
-    const { plotNumber, deceasedId, notes } = data;
+    const rawPlotNumber = data.plotNumber;
+    const plotNumber = normalizePlotNumber(rawPlotNumber);
+    const { deceasedId, notes } = data;
 
     if (!plotNumber || !deceasedId) {
       return { success: false, error: 'Plot number and deceased record are required.' };
@@ -212,7 +237,7 @@ export async function assignDeceasedToGrave(data: {
       prisma.deceasedRecord.update({
         where: { id: deceased.id },
         data: {
-          REMARKS: `Plot ${plotNumber}`
+          REMARKS: `Section ${plot.section} - Plot ${plotNumber}`
         }
       })
     ]);
@@ -232,8 +257,9 @@ export async function assignDeceasedToGrave(data: {
 }
 
 // ── 3. Unassign / Vacate Grave Plot ─────────────────────────
-export async function unassignGrave(plotNumber: string) {
+export async function unassignGrave(rawPlotNumber: string) {
   try {
+    const plotNumber = normalizePlotNumber(rawPlotNumber);
     const plot = await prisma.gravePlot.findUnique({
       where: { plotNumber },
       include: { deceasedRecord: true }
@@ -284,7 +310,9 @@ export async function updateGraveStatus(data: {
   notes?: string;
 }) {
   try {
-    const { plotNumber, status, plotType, notes } = data;
+    const rawPlotNumber = data.plotNumber;
+    const plotNumber = normalizePlotNumber(rawPlotNumber);
+    const { status, plotType, notes } = data;
 
     const plot = await prisma.gravePlot.findUnique({ where: { plotNumber } });
     if (!plot) {
@@ -345,5 +373,45 @@ export async function searchDeceasedForAssignment(query: string = '') {
   } catch (error: any) {
     console.error('Failed to search deceased for assignment:', error);
     return { success: false, error: error.message, records: [] };
+  }
+}
+
+// ── 6. Get All Grave Plots for Selection in Forms ───────────
+export async function getAllGravePlotsForSelect() {
+  try {
+    const count = await prisma.gravePlot.count();
+    if (count === 0) {
+      await seedDefaultPlots();
+    }
+
+    const plots = await prisma.gravePlot.findMany({
+      select: {
+        id: true,
+        plotNumber: true,
+        section: true,
+        row: true,
+        column: true,
+        status: true,
+        plotType: true,
+        deceasedId: true,
+        deceasedRecord: {
+          select: {
+            id: true,
+            NAME_OF_DECEASED: true,
+            REF_NO: true
+          }
+        }
+      },
+      orderBy: [
+        { section: 'asc' },
+        { row: 'asc' },
+        { column: 'asc' }
+      ]
+    });
+
+    return { success: true, plots };
+  } catch (error: any) {
+    console.error('Failed to get grave plots for select:', error);
+    return { success: false, plots: [], error: error.message };
   }
 }

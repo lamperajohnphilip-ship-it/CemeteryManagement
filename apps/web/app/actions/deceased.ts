@@ -94,7 +94,30 @@ export async function addDeceasedRecord(data: {
       }
     });
 
+    // 5. Auto-sync with GravePlot if plot remark was provided (e.g. "A-1", "Section A - Plot A-1")
+    if (data.REMARKS) {
+      const match = data.REMARKS.match(/([A-Ca-c])\s*[-–_]?\s*0*(\d+)/i);
+      if (match) {
+        const sec = match[1]!.toUpperCase();
+        const num = parseInt(match[2]!, 10);
+        const plotCode = `${sec}-${num}`;
+        const targetPlot = await prisma.gravePlot.findUnique({ where: { plotNumber: plotCode } });
+        if (targetPlot && !targetPlot.deceasedId) {
+          await prisma.gravePlot.update({
+            where: { plotNumber: plotCode },
+            data: {
+              status: 'Occupied',
+              deceasedId: record.id
+            }
+          });
+        }
+      }
+    }
+
+    revalidatePath('/admin/deceased-information');
     revalidatePath('/admin/inventory');
+    revalidatePath('/admin/grave-mapping');
+    revalidatePath('/grave-mapping');
     return { success: true, record };
   } catch (error: any) {
     console.error("Error adding deceased record:", error);
@@ -106,6 +129,9 @@ export async function getDeceasedRecords() {
   try {
     const records = await prisma.deceasedRecord.findMany({
       where: { isArchived: false },
+      include: {
+        gravePlot: true
+      },
       orderBy: { createdAt: 'desc' }
     });
     return { success: true, records };
@@ -119,6 +145,9 @@ export async function getArchivedRecords() {
   try {
     const records = await prisma.deceasedRecord.findMany({
       where: { isArchived: true },
+      include: {
+        gravePlot: true
+      },
       orderBy: { archivedAt: 'desc' }
     });
     return { success: true, records };
@@ -141,7 +170,10 @@ export async function updateDeceasedRecord(id: string, data: Partial<{
   REMARKS: string;
 }>) {
   try {
-    const existing = await prisma.deceasedRecord.findUnique({ where: { id } });
+    const existing = await prisma.deceasedRecord.findUnique({
+      where: { id },
+      include: { gravePlot: true }
+    });
     if (!existing) throw new Error("Record not found");
 
     const totalDue = data.TOTAL_DUE !== undefined ? parseFloat(data.TOTAL_DUE as any) : existing.TOTAL_DUE;
@@ -174,7 +206,37 @@ export async function updateDeceasedRecord(id: string, data: Partial<{
       data: updateData,
     });
 
+    // Sync GravePlot changes
+    if (data.REMARKS !== undefined) {
+      const newMatch = data.REMARKS.match(/([A-Ca-c])\s*[-–_]?\s*0*(\d+)/i);
+      const newPlotCode = newMatch ? `${newMatch[1]!.toUpperCase()}-${parseInt(newMatch[2]!, 10)}` : null;
+
+      const currentPlotCode = existing.gravePlot?.plotNumber;
+
+      if (currentPlotCode && currentPlotCode !== newPlotCode) {
+        // Vacate old plot
+        await prisma.gravePlot.update({
+          where: { plotNumber: currentPlotCode },
+          data: { status: 'Available', deceasedId: null }
+        });
+      }
+
+      if (newPlotCode && newPlotCode !== currentPlotCode) {
+        // Occupy new plot
+        const targetPlot = await prisma.gravePlot.findUnique({ where: { plotNumber: newPlotCode } });
+        if (targetPlot) {
+          await prisma.gravePlot.update({
+            where: { plotNumber: newPlotCode },
+            data: { status: 'Occupied', deceasedId: record.id }
+          });
+        }
+      }
+    }
+
+    revalidatePath('/admin/deceased-information');
     revalidatePath('/admin/inventory');
+    revalidatePath('/admin/grave-mapping');
+    revalidatePath('/grave-mapping');
     return { success: true, record };
   } catch (error: any) {
     console.error("Error updating deceased record:", error);

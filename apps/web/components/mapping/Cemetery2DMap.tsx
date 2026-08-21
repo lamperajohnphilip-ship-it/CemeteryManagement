@@ -87,8 +87,13 @@ export default function Cemetery2DMap({
 
   // Center on Highlighted Plot
   const jumpToPlot = useCallback((plotNum: string) => {
-    const target = plots.find(p => p.plotNumber.toLowerCase() === plotNum.toLowerCase());
-    if (!target || !containerRef.current) return;
+    if (!plotNum || !containerRef.current) return;
+    const cleanPlotNum = plotNum.replace(/^([A-Ca-c])\s*[-–_]?\s*0*(\d+)$/i, (_, sec, num) => `${sec.toUpperCase()}-${parseInt(num, 10)}`);
+    const target = plots.find(p =>
+      p.plotNumber.toLowerCase() === plotNum.toLowerCase() ||
+      p.plotNumber.toLowerCase() === cleanPlotNum.toLowerCase()
+    );
+    if (!target) return;
 
     const coords = getPlotCoordinates(target);
     const containerW = containerRef.current.clientWidth;

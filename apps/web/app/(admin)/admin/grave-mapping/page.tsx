@@ -95,9 +95,10 @@ export default function AdminGraveMappingPage() {
   const searchMatches = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase().trim();
+    const cleanQ = q.replace(/^([a-c])\s*[-–_]?\s*0*(\d+)$/i, (_, s, n) => `${s}-${parseInt(n, 10)}`);
     return plots
       .filter(p => {
-        const plotMatch = p.plotNumber.toLowerCase().includes(q);
+        const plotMatch = p.plotNumber.toLowerCase().includes(q) || p.plotNumber.toLowerCase().includes(cleanQ);
         const nameMatch = p.deceasedRecord?.NAME_OF_DECEASED.toLowerCase().includes(q);
         const refMatch = p.deceasedRecord?.REF_NO.toLowerCase().includes(q);
         return plotMatch || nameMatch || refMatch;
@@ -289,7 +290,7 @@ export default function AdminGraveMappingPage() {
           <input
             type="text"
             className={styles.searchInput}
-            placeholder="Search Plot (e.g. A-001) or Deceased Name..."
+            placeholder="Search Plot (e.g. A-1) or Deceased Name..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />

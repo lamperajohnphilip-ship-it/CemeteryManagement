@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
 import styles from './GraveLocator.module.css';
@@ -24,10 +24,11 @@ export default function PublicGraveLocatorPage() {
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase().trim();
+    const cleanQ = q.replace(/^([a-c])\s*[-–_]?\s*0*(\d+)$/i, (_, s, n) => `${s}-${parseInt(n, 10)}`);
     return plots.filter(p => {
       const nameMatch = p.deceasedRecord?.NAME_OF_DECEASED.toLowerCase().includes(q);
       const refMatch = p.deceasedRecord?.REF_NO.toLowerCase().includes(q);
-      const plotMatch = p.plotNumber.toLowerCase().includes(q);
+      const plotMatch = p.plotNumber.toLowerCase().includes(q) || p.plotNumber.toLowerCase().includes(cleanQ);
       return nameMatch || refMatch || plotMatch;
     }).slice(0, 10);
   }, [plots, searchQuery]);
@@ -97,7 +98,7 @@ export default function PublicGraveLocatorPage() {
           <input
             type="text"
             className={styles.searchInput}
-            placeholder="Search by deceased name, reference number, or plot number (e.g. A-001)..."
+            placeholder="Search by deceased name, reference number, or plot number (e.g. A-1)..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             autoComplete="off"

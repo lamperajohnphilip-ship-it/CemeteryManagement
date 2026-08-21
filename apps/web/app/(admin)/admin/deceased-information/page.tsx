@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import styles from './page.module.css';
 import { addDeceasedRecord, getDeceasedRecords, updateDeceasedRecord, archiveDeceasedRecord } from '../../../actions/deceased';
+import { getAllGravePlotsForSelect } from '../../../actions/mapping';
 
 interface PaymentHistory {
   date: string;
@@ -63,6 +64,11 @@ export default function DeceasedInventoryPage() {
   const [editMode, setEditMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  // Graveyard Plot Assignment State
+  const [gravePlots, setGravePlots] = useState<any[]>([]);
+  const [plotSectionFilter, setPlotSectionFilter] = useState('all');
+  const [selectedPlotCode, setSelectedPlotCode] = useState('');
+
   // Modals state
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -102,8 +108,18 @@ export default function DeceasedInventoryPage() {
   // Payment Details state
   const [paymentDetails, setPaymentDetails] = useState<InventoryRecord | null>(null);
 
+  const loadGravePlotsList = async () => {
+    try {
+      const res = await getAllGravePlotsForSelect();
+      if (res.success && res.plots) {
+        setGravePlots(res.plots);
+      }
+    } catch (e) {}
+  };
+
   useEffect(() => {
     loadInventory();
+    loadGravePlotsList();
     const handleStorage = (e: StorageEvent) => {
       if (e.key === INVENTORY_KEY || e.key === PAYMENTS_KEY) loadInventory();
     };
@@ -259,6 +275,9 @@ export default function DeceasedInventoryPage() {
 
   const openNewRecord = () => {
     setErrors({});
+    setSelectedPlotCode('');
+    setPlotSectionFilter('all');
+    loadGravePlotsList();
     setFormState({
       id: '', ref: `${new Date().getFullYear()}-000`, payor: '', deceased: '', gender: 'Male', address: '', contact: '',
       birthDate: '', deathDate: '', yearPaid: new Date().getFullYear().toString(), totalAmount: '', amountPaid: '', duePaymentSchedule: '', civilStatus: 'Single', remarks: ''
@@ -270,6 +289,16 @@ export default function DeceasedInventoryPage() {
     const r = inventory.find(x => x.id === id);
     if (!r) return;
     setErrors({});
+    loadGravePlotsList();
+    const match = (r.remarks || '').match(/([A-Ca-c])\s*[-–_]?\s*0*(\d+)/i);
+    if (match) {
+      const pCode = `${match[1]!.toUpperCase()}-${parseInt(match[2]!, 10)}`;
+      setSelectedPlotCode(pCode);
+      setPlotSectionFilter(match[1]!.toUpperCase());
+    } else {
+      setSelectedPlotCode('');
+      setPlotSectionFilter('all');
+    }
     setFormState({
       id: r.id, ref: r.ref, payor: r.payor, deceased: r.deceased, gender: r.gender || 'Male',
       address: r.address, contact: r.contact, birthDate: r.birthDate || '', deathDate: r.deathDate, yearPaid: r.yearPaid,
@@ -1017,12 +1046,66 @@ export default function DeceasedInventoryPage() {
                   {errors.civilStatus && <span className={styles.errorText}>{errors.civilStatus}</span>}
                 </div>
               </div>
+              <div className={styles.formSectionLabel}>Graveyard Location &amp; Plot Assignment</div>
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label>Cemetery Section</label>
+                  <select
+                    className={styles.formControl}
+                    value={plotSectionFilter}
+                    onChange={e => {
+                      setPlotSectionFilter(e.target.value);
+                    }}
+                  >
+                    <option value="all">All Sections (A, B, C)</option>
+                    <option value="A">Section A · West Lawn (A-1 to A-80)</option>
+                    <option value="B">Section B · East Lawn (B-1 to B-80)</option>
+                    <option value="C">Section C · North Garden (C-1 to C-87)</option>
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Graveyard Plot (e.g. A-1, A-2)</label>
+                  <select
+                    className={styles.formControl}
+                    value={selectedPlotCode}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setSelectedPlotCode(val);
+                      if (val) {
+                        const p = gravePlots.find(x => x.plotNumber === val);
+                        const sec = p ? p.section : val.split('-')[0];
+                        handleFieldChange('remarks', `Section ${sec} - Plot ${val}`);
+                      }
+                    }}
+                  >
+                    <option value="">-- Choose Graveyard Plot (Optional) --</option>
+                    {gravePlots
+                      .filter(p => plotSectionFilter === 'all' || p.section === plotSectionFilter)
+                      .map(p => {
+                        const isCurrentPlot = formState.id && p.deceasedRecord?.id === formState.id;
+                        const isAvail = p.status === 'Available' || isCurrentPlot;
+                        return (
+                          <option key={p.id} value={p.plotNumber} disabled={!isAvail && p.status === 'Occupied'}>
+                            {p.plotNumber} · {p.status === 'Available' ? '🟢 Available' : isCurrentPlot ? '📍 Current Assigned Plot' : `🔴 Occupied (${p.deceasedRecord?.NAME_OF_DECEASED || 'Assigned'})`} · {p.plotType}
+                          </option>
+                        );
+                      })}
+                  </select>
+                </div>
+              </div>
               <div className={styles.formGroup}>
                 <label>Remarks / Lot No. *</label>
                 <input
                   className={`${styles.formControl} ${errors.remarks ? styles.inputError : ''}`}
                   value={formState.remarks}
-                  onChange={e => handleFieldChange('remarks', e.target.value)}
+                  onChange={e => {
+                    handleFieldChange('remarks', e.target.value);
+                    const match = e.target.value.match(/([A-Ca-c])\s*[-–_]?\s*0*(\d+)/i);
+                    if (match) {
+                      setSelectedPlotCode(`${match[1]!.toUpperCase()}-${parseInt(match[2]!, 10)}`);
+                    }
+                  }}
+                  placeholder="e.g. Section A - Plot A-1"
                 />
                 {errors.remarks && <span className={styles.errorText}>{errors.remarks}</span>}
               </div>
