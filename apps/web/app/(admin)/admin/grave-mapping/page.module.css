@@ -395,3 +395,81 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ===== SPLIT LAYOUT ===== */
+.mainLayout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 20px;
+  margin-bottom: 30px;
+  align-items: flex-start;
+}
+.mapArea { min-width: 0; }
+.mapHint {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.75rem; color: #7A7570; margin-top: 8px; padding: 0 4px;
+}
+.assignmentPanel {
+  background: var(--admin-panel-bg); border: 1px solid var(--admin-border);
+  border-radius: 14px; overflow: hidden; min-height: 500px; max-height: 700px;
+  overflow-y: auto; position: sticky; top: 20px;
+}
+.panelIdle { display: flex; flex-direction: column; align-items: center; padding: 32px 20px 20px; text-align: center; }
+.panelIdleIcon {
+  width: 72px; height: 72px; border-radius: 18px; background: rgba(200,168,75,0.08);
+  border: 1px solid rgba(200,168,75,0.2); display: flex; align-items: center;
+  justify-content: center; margin-bottom: 14px; color: #C8A84B;
+}
+.panelIdleTitle { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; color: #E2C97E; margin-bottom: 8px; font-weight: 600; }
+.panelIdleDesc { font-size: 0.8rem; color: #7A7570; line-height: 1.6; margin-bottom: 20px; max-width: 280px; }
+.plotQuickList { width: 100%; border-top: 1px solid var(--admin-border); padding-top: 16px; text-align: left; }
+.plotQuickListTitle { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em; color: #7A7570; margin-bottom: 8px; padding: 0 4px; }
+.plotQuickItem { display: flex; align-items: center; gap: 10px; width: 100%; background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 8px 10px; cursor: pointer; text-align: left; transition: all 0.15s; margin-bottom: 4px; }
+.plotQuickItem:hover { background: rgba(200,168,75,0.08); border-color: rgba(200,168,75,0.2); }
+.plotQuickBadge { font-family: monospace; font-size: 0.82rem; font-weight: bold; color: #E2C97E; background: rgba(200,168,75,0.12); padding: 3px 8px; border-radius: 6px; min-width: 48px; text-align: center; }
+.plotQuickArrow { margin-left: auto; font-size: 0.72rem; color: #4caf50; }
+.panelActive { display: flex; flex-direction: column; }
+.panelHeader { padding: 16px 18px; border-bottom: 1px solid var(--admin-border); display: flex; justify-content: space-between; align-items: flex-start; background: rgba(200,168,75,0.04); }
+.panelHeaderLeft {}
+.panelPlotNumber { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; color: #E2C97E; font-weight: 700; line-height: 1.1; }
+.panelPlotSection { font-size: 0.72rem; color: #7A7570; margin-top: 3px; }
+.panelStatusBadge { font-size: 0.68rem; font-weight: 700; padding: 3px 8px; border-radius: 12px; letter-spacing: 0.04em; white-space: nowrap; }
+.panelCloseBtn { width: 28px; height: 28px; border-radius: 6px; background: transparent; border: 1px solid var(--admin-border); color: #7A7570; font-size: 1.15rem; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; transition: all 0.15s; padding: 0; margin-left: 4px; }
+.panelCloseBtn:hover { background: rgba(239,83,80,0.1); border-color: rgba(239,83,80,0.4); color: #ef9a9a; }
+.tabBar { display: flex; border-bottom: 1px solid var(--admin-border); background: rgba(0,0,0,0.1); }
+.tabBtn { flex: 1; padding: 10px 6px; background: transparent; border: none; color: #7A7570; font-size: 0.76rem; font-weight: 600; cursor: pointer; transition: all 0.15s; border-bottom: 2px solid transparent; }
+.tabBtn:hover:not(:disabled) { color: #d6d3d1; background: rgba(255,255,255,0.03); }
+.tabBtn:disabled { opacity: 0.35; cursor: not-allowed; }
+.tabBtnActive { color: #E2C97E !important; border-bottom-color: #C8A84B !important; }
+.tabContent { padding: 16px; }
+.deceasedProfileCard { background: rgba(200,168,75,0.06); border: 1px solid rgba(200,168,75,0.25); border-radius: 10px; padding: 14px; text-align: center; margin-bottom: 14px; }
+.deceasedCross { font-size: 1.4rem; color: #C8A84B; margin-bottom: 6px; }
+.deceasedName { font-family: 'Cormorant Garamond', serif; font-size: 1.15rem; color: #ffffff; font-weight: 600; margin-bottom: 4px; }
+.deceasedRef { font-family: monospace; font-size: 0.7rem; color: #7A7570; }
+.detailGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.detailItem { background: rgba(0,0,0,0.2); border-radius: 8px; padding: 8px 10px; }
+.detailLabel { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; color: #7A7570; margin-bottom: 3px; }
+.detailValue { font-size: 0.82rem; color: #d6d3d1; font-weight: 500; word-break: break-word; }
+.detailNotes { font-size: 0.78rem; color: #a8a29e; background: rgba(200,168,75,0.06); border-radius: 6px; padding: 8px 10px; border-left: 2px solid rgba(200,168,75,0.4); margin-top: 6px; }
+.assignInstruction { display: flex; align-items: flex-start; gap: 8px; font-size: 0.8rem; color: #a8a29e; background: rgba(56,189,248,0.06); border: 1px solid rgba(56,189,248,0.15); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; line-height: 1.5; }
+.deceasedResultList { max-height: 180px; overflow-y: auto; border: 1px solid var(--admin-border); border-radius: 8px; margin-bottom: 12px; background: rgba(0,0,0,0.15); }
+.emptyResults { padding: 16px; text-align: center; color: #7A7570; font-size: 0.8rem; }
+.deceasedResultItem { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid rgba(200,168,75,0.1); cursor: pointer; transition: background 0.15s; }
+.deceasedResultItem:last-child { border-bottom: none; }
+.deceasedResultItem:hover { background: rgba(200,168,75,0.08); }
+.deceasedResultItemSelected { background: rgba(200,168,75,0.14) !important; border-left: 3px solid #C8A84B; }
+.deceasedResultCheck { width: 20px; height: 20px; border-radius: 50%; border: 2px solid rgba(200,168,75,0.4); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #C8A84B; font-weight: bold; flex-shrink: 0; background: rgba(200,168,75,0.1); }
+.deceasedResultBody { flex: 1; min-width: 0; }
+.deceasedResultName { font-size: 0.85rem; color: #ffffff; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.deceasedResultMeta { font-size: 0.7rem; color: #7A7570; margin-top: 1px; }
+.selectedDeceasedConfirm { background: rgba(200,168,75,0.07); border: 1px solid rgba(200,168,75,0.35); border-radius: 10px; padding: 12px 14px; margin-top: 4px; }
+.confirmLabel { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: #7A7570; margin-bottom: 4px; }
+.confirmName { font-size: 1rem; font-weight: 700; color: #E2C97E; margin-bottom: 2px; }
+.confirmMeta { font-size: 0.72rem; color: #a8a29e; }
+.orDivider { display: flex; align-items: center; gap: 10px; margin: 14px 0; color: #7A7570; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; }
+.orDivider::before, .orDivider::after { content: ''; flex: 1; height: 1px; background: var(--admin-border); }
+.emptyState { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 12px; text-align: center; min-height: 180px; }
+@media (max-width: 1100px) {
+  .mainLayout { grid-template-columns: 1fr; }
+  .assignmentPanel { position: static; }
+}
