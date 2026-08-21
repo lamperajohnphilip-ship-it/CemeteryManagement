@@ -485,10 +485,6 @@ export default function InquiriesPage() {
         </div>
       </div>
 
-      <div style={{ color: '#7A7570', fontSize: '0.75rem', textAlign: 'right' }}>
-        <span>Connected to User Inquiry System · Automatic Email Notification Enabled</span>
-      </div>
-
       {/* Review / Status Modal */}
       {modalOpen && (
         <div className={styles.modalOverlay} onClick={(e) => { if (e.target === e.currentTarget) setModalOpen(false); }}>
