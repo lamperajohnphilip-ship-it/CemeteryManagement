@@ -111,7 +111,17 @@ export default function InquiryPage() {
       if (res.success) {
         setOtpSent(true);
         setResendCooldown(60);
-        setOtpMessage({ text: res.message, type: 'success' });
+
+        // If email credentials aren't configured yet, auto-fill the code for testing
+        if ((res as any).devFallback && (res as any).debugCode) {
+          setOtpCode((res as any).debugCode);
+          setOtpMessage({
+            text: `⚠️ Gmail SMTP not configured yet. Your verification code is: ${(res as any).debugCode} (auto-filled for testing). To enable real email delivery, set EMAIL_USER and EMAIL_APP_PASSWORD in your .env file.`,
+            type: 'info'
+          });
+        } else {
+          setOtpMessage({ text: res.message, type: 'success' });
+        }
       } else {
         setOtpMessage({ text: res.message || 'Failed to send verification code.', type: 'error' });
       }
