@@ -1,215 +1,246 @@
-'use client';
+﻿'use client';
 
-import { useEffect, useRef } from 'react';
-import Script from 'next/script';
-import './mapping.css';
+import React, { useState, useEffect, useMemo } from 'react';
+import styles from './GraveLocator.module.css';
+import Cemetery2DMap from '../../../components/mapping/Cemetery2DMap';
+import { getGraveMapData, GravePlotWithDeceased } from '../../actions/mapping';
 
-export default function MappingPage() {
-  const initialized = useRef(false);
+export default function PublicGraveLocatorPage() {
+  const [plots, setPlots] = useState<GravePlotWithDeceased[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedPlot, setSelectedPlot] = useState<GravePlotWithDeceased | null>(null);
+  const [highlightPlot, setHighlightPlot] = useState<string | null>(null);
+  const [showDetailsPanel, setShowDetailsPanel] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      (window as any).openView = (window as any).openView || function(key: string) {
-        if ((window as any)._realOpenView) (window as any)._realOpenView(key);
-      };
-      (window as any).closeView = (window as any).closeView || function() {
-        if ((window as any)._realCloseView) (window as any)._realCloseView();
-      };
-      (window as any).setCamera = (window as any).setCamera || function(cam: any, btn: any) {
-        if ((window as any)._realSetCamera) (window as any)._realSetCamera(cam, btn);
-      };
-      (window as any).toggleLayer = (window as any).toggleLayer || function(layer: any, btn: any) {
-        if ((window as any)._realToggleLayer) (window as any)._realToggleLayer(layer, btn);
-      };
-      (window as any).closeGravePopup = (window as any).closeGravePopup || function() {
-        if ((window as any)._realCloseGravePopup) (window as any)._realCloseGravePopup();
-      };
-      (window as any).showGravePopup = (window as any).showGravePopup || function(plot: any) {
-        if ((window as any)._realShowGravePopup) (window as any)._realShowGravePopup(plot);
-      };
-    }
-
-    const timer = setInterval(() => {
-      if (typeof window !== 'undefined' && (window as any).initMapping && !initialized.current) {
-        (window as any).initMapping();
-        initialized.current = true;
-        clearInterval(timer);
-      }
-    }, 100);
-    return () => clearInterval(timer);
+    (async () => {
+      const res = await getGraveMapData();
+      if (res.success && res.plots) setPlots(res.plots);
+      setLoading(false);
+    })();
   }, []);
 
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase().trim();
+    return plots.filter(p => {
+      const nameMatch = p.deceasedRecord?.NAME_OF_DECEASED.toLowerCase().includes(q);
+      const refMatch = p.deceasedRecord?.REF_NO.toLowerCase().includes(q);
+      const plotMatch = p.plotNumber.toLowerCase().includes(q);
+      return nameMatch || refMatch || plotMatch;
+    }).slice(0, 10);
+  }, [plots, searchQuery]);
+
+  const handleLocate = (plot: GravePlotWithDeceased) => {
+    setSelectedPlot(plot);
+    setHighlightPlot(plot.plotNumber);
+    setSearchQuery('');
+    setShowDetailsPanel(true);
+  };
+
+  const handleMapClick = (plot: GravePlotWithDeceased) => {
+    setSelectedPlot(plot);
+    setHighlightPlot(plot.plotNumber);
+    setShowDetailsPanel(true);
+  };
+
+  const stats = {
+    total: plots.length,
+    occupied: plots.filter(p => p.status === 'Occupied').length,
+    available: plots.filter(p => p.status === 'Available').length,
+  };
+
   return (
-    <div className="mapping-root">
-      <div style={{ width: '100%', height: 'calc(100vh - 60px)', position: 'relative' }}>
-        <div dangerouslySetInnerHTML={{ __html: `<!-- UPDATED NAVIGATION - NO SIDEBAR BUTTON -->
-<nav>
-  <div class="nav-left">
-    <div class="nav-logo">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z"/>
-        <circle cx="12" cy="9" r="2.5"/>
-      </svg>
-      ETERNAL REST
-    </div>
-    <div class="nav-title">Mapping</div>
-  </div>
-  <!-- BACK TO PORTAL BUTTON -->
-  <a class="nav-back" href="/">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-    Back to Portal
-  </a>
-</nav>
-
-<!-- SIDEBAR AND OVERLAY COMPLETELY REMOVED -->
-
-<!-- MAIN GRID -->
-<div class="main-grid" id="mainGrid">
-  <div class="loc-card card-big" id="card-public" onclick="openView('public')">
-    <canvas class="card-canvas" id="cv-public"></canvas>
-    <div class="card-overlay"><div class="card-tag">Municipal</div><div class="card-name">Public Cemetery</div><div class="card-stats"><span class="stat-dot"></span><span>247 plots · 74% occupied</span></div></div>
-    <div class="card-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
-  </div>
-  <div class="loc-card card-small disabled" id="card-bobontugan" onclick="alert('This cemetery map is currently not available.')">
-    <canvas class="card-canvas" id="cv-bobontugan"></canvas>
-    <div class="card-overlay"><div class="card-tag">Cemetery · Jasaan</div><div class="card-name">Bobontugan</div><div><span class="na-badge">Not Available</span></div></div>
-  </div>
-  <div class="loc-card card-small disabled" id="card-private" onclick="alert('This cemetery map is currently not available.')">
-    <canvas class="card-canvas" id="cv-private"></canvas>
-    <div class="card-overlay"><div class="card-tag">Private</div><div class="card-name">Private Cemetery</div><div><span class="na-badge">Not Available</span></div></div>
-  </div>
-  <div class="loc-card card-small disabled" id="card-meedu" onclick="alert('This cemetery map is currently not available.')">
-    <canvas class="card-canvas" id="cv-meedu"></canvas>
-    <div class="card-overlay"><div class="card-tag">Barangay</div><div class="card-name">Meedu</div><div><span class="na-badge">Not Available</span></div></div>
-  </div>
-</div>
-
-<!-- 3D VIEW -->
-<div id="view3d">
-  <div class="v3-nav">
-    <div class="v3-title" id="v3Title">—</div>
-    <button class="v3-back" onclick="closeView()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-      Back to Map
-    </button>
-  </div>
-  <div class="v3-toolbar">
-    <span class="tb-label">Camera:</span>
-    <button class="tb-btn on" id="tb-persp" onclick="setCamera('perspective',this)">3D Perspective</button>
-    <button class="tb-btn" id="tb-top" onclick="setCamera('top',this)">Top Down</button>
-    <button class="tb-btn" id="tb-iso" onclick="setCamera('isometric',this)">Isometric</button>
-    <div class="tb-sep"></div>
-    <span class="tb-label">Toggle:</span>
-    <button class="tb-btn on" id="tb-occ" onclick="toggleLayer('occupied',this)">Occupied</button>
-    <button class="tb-btn on" id="tb-avail" onclick="toggleLayer('available',this)">Available</button>
-    <button class="tb-btn on" id="tb-paths" onclick="toggleLayer('paths',this)">Paths</button>
-    <div class="tb-hint">Drag to rotate · Scroll to zoom · <strong style="color:var(--orange)">Click orange pin</strong> to view grave details</div>
-  </div>
-  <div class="v3-body">
-    <div class="loader" id="loader">
-      <div class="loader-ring"></div>
-      <div class="loader-txt" id="loaderTxt">Loading 3D View…</div>
-    </div>
-    <canvas id="c3d"></canvas>
-
-    <!-- GRAVE POPUP MODAL -->
-    <div class="grave-popup-overlay" id="gravePopupOverlay" onclick="if(event.target===this)closeGravePopup()">
-      <div class="grave-popup" id="gravePopup">
-        <div class="gp-tomb-preview">
-          <canvas id="tombCanvas"></canvas>
-          <div class="gp-tomb-label">3D Grave Preview</div>
-          <div class="gp-tomb-badge" id="tombBadge">Plot —</div>
-        </div>
-        <div class="gp-header">
-          <button class="gp-close" onclick="closeGravePopup()">&#x2715;</button>
-          <div class="gp-pin-badge"><div class="gp-pin-dot"></div><span class="gp-pin-label">Located Grave</span></div>
-          <div class="gp-name" id="gpName">&#8212;</div>
-          <div class="gp-plot-tag" id="gpPlot">&#8212;</div>
-        </div>
-        <div class="gp-body">
-          <div class="gp-dates-row">
-            <div class="gp-birth" id="gpBorn">&#8212;</div>
-            <div class="gp-dash">&#8212;</div>
-            <div class="gp-death" id="gpDied">&#8212;</div>
-            <div class="gp-age-badge" id="gpAge">&#8212;</div>
+    <div className={styles.root}>
+      <div className={styles.header}>
+        <div className={styles.headerLeft}>
+          <div className={styles.headerIcon}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="28" height="28">
+              <path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z"/>
+              <circle cx="12" cy="9" r="2.5"/>
+            </svg>
           </div>
-          <div class="gp-grid">
-            <div class="gp-field"><div class="gp-field-label">Cause of Death</div><div class="gp-field-val" id="gpCause">&#8212;</div></div>
-            <div class="gp-field"><div class="gp-field-label">Religion</div><div class="gp-field-val" id="gpReligion">&#8212;</div></div>
-            <div class="gp-field"><div class="gp-field-label">Nationality</div><div class="gp-field-val" id="gpNat">&#8212;</div></div>
-            <div class="gp-field"><div class="gp-field-label">Next of Kin</div><div class="gp-field-val" id="gpKin">&#8212;</div></div>
-            <div class="gp-field full"><div class="gp-field-label">Contact Number</div><div class="gp-field-val" id="gpContact">&#8212;</div></div>
-          </div>
-          <div class="gp-actions">
-            <a class="gp-btn-primary" id="gpBackBtn" href="cemetery-management.html">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-              Back to Portal
-            </a>
-            <button class="gp-btn-secondary" onclick="flyToTarget();closeGravePopup()">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-              Focus View
-            </button>
+          <div>
+            <h1 className={styles.headerTitle}>Grave Locator</h1>
+            <p className={styles.headerSub}>Search and locate grave plots at Jasaan Public Cemetery</p>
           </div>
         </div>
+        {!loading && (
+          <div className={styles.headerStats}>
+            <div className={styles.miniStat}>
+              <span className={styles.miniStatVal}>{stats.total}</span>
+              <span className={styles.miniStatLabel}>Total Plots</span>
+            </div>
+            <div className={styles.miniStatDivider} />
+            <div className={styles.miniStat}>
+              <span className={styles.miniStatVal} style={{ color: '#ef5350' }}>{stats.occupied}</span>
+              <span className={styles.miniStatLabel}>Occupied</span>
+            </div>
+            <div className={styles.miniStatDivider} />
+            <div className={styles.miniStat}>
+              <span className={styles.miniStatVal} style={{ color: '#66bb6a' }}>{stats.available}</span>
+              <span className={styles.miniStatLabel}>Available</span>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
 
-    <!-- FIND GRAVE FLOATING BUTTON -->
-    <button class="find-grave-btn" id="findGraveBtn" onclick="flyToTarget();showGravePopup()">
-      <div class="find-btn-icon">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-      </div>
-      Find Grave
-    </button>
+      <div className={styles.searchSection}>
+        <div className={styles.searchWrapper}>
+          <span className={styles.searchIconWrapper}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="m21 21-4.3-4.3"/>
+            </svg>
+          </span>
+          <input
+            type="text"
+            className={styles.searchInput}
+            placeholder="Search by deceased name, reference number, or plot number (e.g. A-001)..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            autoComplete="off"
+          />
+          {searchQuery && (
+            <button className={styles.searchClear} onClick={() => setSearchQuery('')}>x</button>
+          )}
+        </div>
 
-    <!-- PIN HOVER LABEL -->
-    <div class="pin-label" id="pinLabel">
-      <div class="pin-label-bubble">
-        <div class="pin-label-name" id="pinLabelName">&#8212;</div>
-        <div class="pin-label-plot" id="pinLabelPlot">&#8212;</div>
-        <div class="pin-label-hint">Click to view details</div>
-      </div>
-      <div class="pin-label-arrow"></div>
-    </div>
+        {searchResults.length > 0 && (
+          <div className={styles.searchResults}>
+            {searchResults.map(plot => (
+              <div key={plot.id} className={styles.searchResultItem} onClick={() => handleLocate(plot)}>
+                <div className={styles.searchResultLeft}>
+                  <div className={styles.searchResultPlot}>Plot {plot.plotNumber}</div>
+                  {plot.deceasedRecord ? (
+                    <>
+                      <div className={styles.searchResultName}>{plot.deceasedRecord.NAME_OF_DECEASED}</div>
+                      <div className={styles.searchResultMeta}>Ref: {plot.deceasedRecord.REF_NO} - Section {plot.section}</div>
+                    </>
+                  ) : (
+                    <div className={styles.searchResultName} style={{ color: '#66bb6a' }}>Available Plot</div>
+                  )}
+                </div>
+                <div className={styles.searchResultLocate}>
+                  <span className={`${styles.statusDot} ${plot.status === 'Occupied' ? styles.dotOccupied : plot.status === 'Available' ? styles.dotAvailable : styles.dotReserved}`} />
+                  <span>{plot.status}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
-    <div class="v3-info">
-      <div class="v3-info-head">
-        <div class="v3-info-eyebrow">Cemetery Info</div>
-        <div class="v3-info-name" id="v3InfoName">—</div>
+        {searchQuery.trim() && searchResults.length === 0 && !loading && (
+          <div className={styles.noResults}>
+            <p>No graves found matching &ldquo;<strong>{searchQuery}</strong>&rdquo;</p>
+          </div>
+        )}
       </div>
-      <div class="v3-info-body" id="v3InfoBody">
-        <div id="graveDetailSlot"></div>
-        <div class="info-section" id="legendSection">
-          <div class="info-section-title">Legend</div>
-          <div class="leg-row"><div class="leg-box" style="background:var(--gold)"></div>Occupied Grave</div>
-          <div class="leg-row"><div class="leg-box" style="background:var(--moss)"></div>Available Plot</div>
-          <div class="leg-row"><div class="leg-box" style="background:var(--fog)"></div>Pathway / Walkway</div>
-          <div class="leg-row"><div class="leg-box" style="background:var(--stone)"></div>Ground</div>
-          <div class="leg-row"><div class="leg-box" style="background:#ff9922;border:1px solid #ffbb44"></div>Located Grave (Pin)</div>
-        </div>
-        <div class="info-section">
-          <div class="info-section-title">Statistics</div>
-          <div class="kv-row"><div class="kv-key">Total Plots</div><div class="kv-val gold" id="kv-total">—</div></div>
-          <div class="kv-row"><div class="kv-key">Occupied</div><div class="kv-val" id="kv-occ">—</div></div>
-          <div class="kv-row"><div class="kv-key">Available</div><div class="kv-val green" id="kv-avail">—</div></div>
-          <div class="kv-row"><div class="kv-key">Sections</div><div class="kv-val" id="kv-sec">—</div></div>
-          <div class="kv-row"><div class="kv-key">Location</div><div class="kv-val" id="kv-loc">—</div></div>
-          <div class="kv-row" id="kv-locate-row" style="display:none"><div class="kv-key">Locating</div><div class="kv-val orange" id="kv-locate-name">—</div></div>
-        </div>
-        <div class="hint-card">
-          🖱 Left-drag &nbsp; Rotate view<br>
-          🖱 Right-drag &nbsp; Pan camera<br>
-          ⚙ Scroll &nbsp; Zoom in/out<br>
-          🔶 Click orange pin &nbsp; View grave details
-        </div>
+
+      <div className={styles.mapSection}>
+        {loading ? (
+          <div className={styles.loadingState}>
+            <div className={styles.loadingSpinner} />
+            <p>Loading cemetery map...</p>
+          </div>
+        ) : (
+          <Cemetery2DMap
+            plots={plots}
+            selectedPlotNumber={selectedPlot?.plotNumber}
+            highlightPlotNumber={highlightPlot}
+            onSelectPlot={handleMapClick}
+            readOnly={true}
+          />
+        )}
       </div>
-    </div>
-  </div>
-</div>
-        ` }} />
-        <Script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" strategy="beforeInteractive" />
-        <Script src="/mapping-script.js" strategy="afterInteractive" />
-      </div>
+
+      {showDetailsPanel && selectedPlot && (
+        <div
+          className={styles.detailsPanelOverlay}
+          onClick={e => { if (e.target === e.currentTarget) { setShowDetailsPanel(false); setHighlightPlot(null); } }}
+        >
+          <div className={styles.detailsPanel}>
+            <button
+              className={styles.detailsClose}
+              onClick={() => { setShowDetailsPanel(false); setHighlightPlot(null); }}
+            >x</button>
+
+            <div className={styles.detailsPlotBadge}>Plot {selectedPlot.plotNumber}</div>
+
+            <div
+              className={styles.detailsStatusBadge}
+              style={{
+                background: selectedPlot.status === 'Occupied' ? 'rgba(139,0,0,0.3)' :
+                  selectedPlot.status === 'Available' ? 'rgba(46,125,50,0.3)' :
+                  selectedPlot.status === 'Reserved' ? 'rgba(178,106,0,0.3)' : 'rgba(2,119,189,0.3)',
+                borderColor: selectedPlot.status === 'Occupied' ? '#e53935' :
+                  selectedPlot.status === 'Available' ? '#4caf50' :
+                  selectedPlot.status === 'Reserved' ? '#fb8c00' : '#29b6f6',
+                color: selectedPlot.status === 'Occupied' ? '#ffcdd2' :
+                  selectedPlot.status === 'Available' ? '#a5d6a7' :
+                  selectedPlot.status === 'Reserved' ? '#ffe0b2' : '#e1f5fe',
+              }}
+            >
+              {selectedPlot.status}
+            </div>
+
+            {selectedPlot.deceasedRecord ? (
+              <>
+                <h2 className={styles.detailsName}>{selectedPlot.deceasedRecord.NAME_OF_DECEASED}</h2>
+                <div className={styles.detailsRefNo}>{selectedPlot.deceasedRecord.REF_NO}</div>
+
+                <div className={styles.detailsDatesRow}>
+                  <div className={styles.detailsDateCard}>
+                    <div className={styles.detailsDateLabel}>Born</div>
+                    <div className={styles.detailsDateValue}>
+                      {new Date(selectedPlot.deceasedRecord.DATE_OF_BIRTH).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </div>
+                  </div>
+                  <div className={styles.detailsDateDivider}>+</div>
+                  <div className={styles.detailsDateCard}>
+                    <div className={styles.detailsDateLabel}>Passed</div>
+                    <div className={styles.detailsDateValue}>
+                      {new Date(selectedPlot.deceasedRecord.DATE_OF_DEATH).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.detailsInfoGrid}>
+                  <div className={styles.detailsInfoItem}>
+                    <span className={styles.detailsInfoLabel}>Section</span>
+                    <span className={styles.detailsInfoValue}>{selectedPlot.section}</span>
+                  </div>
+                  <div className={styles.detailsInfoItem}>
+                    <span className={styles.detailsInfoLabel}>Plot Type</span>
+                    <span className={styles.detailsInfoValue}>{selectedPlot.plotType}</span>
+                  </div>
+                  <div className={styles.detailsInfoItem}>
+                    <span className={styles.detailsInfoLabel}>Row / Column</span>
+                    <span className={styles.detailsInfoValue}>Row {selectedPlot.row}, Col {selectedPlot.column}</span>
+                  </div>
+                  <div className={styles.detailsInfoItem}>
+                    <span className={styles.detailsInfoLabel}>Next of Kin</span>
+                    <span className={styles.detailsInfoValue}>{selectedPlot.deceasedRecord.PAYORS_NAME}</span>
+                  </div>
+                  {selectedPlot.notes && (
+                    <div className={styles.detailsInfoItem} style={{ gridColumn: '1 / -1' }}>
+                      <span className={styles.detailsInfoLabel}>Notes</span>
+                      <span className={styles.detailsInfoValue}>{selectedPlot.notes}</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className={styles.detailsEmpty}>
+                <p style={{ color: '#a8a29e', fontSize: '0.85rem', textAlign: 'center' }}>
+                  This plot is <strong style={{ color: '#66bb6a' }}>available</strong>. Section {selectedPlot.section}, Row {selectedPlot.row}, Col {selectedPlot.column}.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

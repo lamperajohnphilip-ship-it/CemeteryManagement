@@ -1,0 +1,200 @@
+.mapContainer {
+  position: relative;
+  width: 100%;
+  height: 650px;
+  background: #0d110f;
+  border-radius: 14px;
+  border: 1px solid rgba(200, 168, 75, 0.25);
+  overflow: hidden;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+  user-select: none;
+}
+
+.mapViewport {
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  position: relative;
+  touch-action: none;
+}
+
+.mapViewport:active {
+  cursor: grabbing;
+}
+
+.svgMap {
+  display: block;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+/* ===== CONTROL BUTTONS ===== */
+.mapControls {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 20;
+}
+
+.controlBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(22, 26, 23, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(200, 168, 75, 0.3);
+  color: #E2C97E;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.1rem;
+  font-weight: bold;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.controlBtn:hover {
+  background: rgba(200, 168, 75, 0.2);
+  border-color: #C8A84B;
+  color: #ffffff;
+  transform: scale(1.05);
+}
+
+/* ===== SECTION JUMP BAR ===== */
+.sectionJumps {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  gap: 8px;
+  z-index: 20;
+  background: rgba(18, 22, 20, 0.85);
+  backdrop-filter: blur(8px);
+  padding: 6px 10px;
+  border-radius: 30px;
+  border: 1px solid rgba(200, 168, 75, 0.25);
+}
+
+.jumpBtn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #a8a29e;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.jumpBtn:hover, .jumpBtnActive {
+  background: rgba(200, 168, 75, 0.2);
+  border-color: rgba(200, 168, 75, 0.4);
+  color: #E2C97E;
+}
+
+/* ===== LEGEND BAR ===== */
+.mapLegend {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  background: rgba(18, 22, 20, 0.88);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(200, 168, 75, 0.25);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  z-index: 20;
+  flex-wrap: wrap;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: #d6d3d1;
+  font-weight: 500;
+}
+
+.legendColor {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.colorAvailable { background: #2e7d32; }
+.colorOccupied { background: #c62828; }
+.colorReserved { background: #e65100; }
+.colorMaintenance { background: #0277bd; }
+.colorUnavailable { background: #424242; }
+
+/* ===== HOVER TOOLTIP ===== */
+.mapTooltip {
+  position: absolute;
+  pointer-events: none;
+  z-index: 50;
+  background: rgba(15, 18, 16, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid #C8A84B;
+  border-radius: 8px;
+  padding: 10px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  min-width: 170px;
+  max-width: 250px;
+  transform: translate(-50%, -120%);
+  transition: opacity 0.12s ease-out;
+}
+
+.tooltipTitle {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #E2C97E;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tooltipBadge {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.tooltipText {
+  font-size: 0.75rem;
+  color: #d6d3d1;
+  margin: 2px 0;
+  line-height: 1.35;
+}
+
+.tooltipDeceased {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(200, 168, 75, 0.3);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+/* ===== PULSING LOCATE BEACON ===== */
+@keyframes beaconPulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.6); opacity: 0.4; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+.pulseCircle {
+  animation: beaconPulse 1.6s infinite ease-out;
+  transform-origin: center;
+}

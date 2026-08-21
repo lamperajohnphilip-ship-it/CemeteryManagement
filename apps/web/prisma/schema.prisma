@@ -34,6 +34,8 @@ model DeceasedRecord {
   archivedAt       DateTime?
   archiveReason    String?
 
+  gravePlot        GravePlot?
+
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -103,4 +105,23 @@ model AnnouncementComment {
   announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
 
   @@map("announcement_comments")
+}
+
+model GravePlot {
+  id             String          @id @default(cuid())
+  plotNumber     String          @unique // e.g. "A-001", "A-002", "B-015", "C-050"
+  section        String          // "A", "B", "C"
+  row            Int
+  column         Int
+  status         String          @default("Available") // "Available", "Occupied", "Reserved", "Maintenance", "Unavailable"
+  plotType       String          @default("Standard Ground Plot") // "Standard Ground Plot", "Mausoleum", "Lawn Lot", "Niche"
+  notes          String?
+  
+  deceasedId     String?         @unique
+  deceasedRecord DeceasedRecord? @relation(fields: [deceasedId], references: [id], onDelete: SetNull)
+
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@map("grave_plots")
 }
