@@ -103,37 +103,69 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 1200px;
+  min-width: 1300px;
+  table-layout: fixed;
 }
 
 .table th {
-  padding: 14px 18px;
+  padding: 12px 14px;
   text-align: left;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #C8A84B;
   border-bottom: 1px solid rgba(200, 168, 75, 0.25);
   background: var(--admin-table-hdr-bg);
+  white-space: nowrap;
 }
 
+/* Column widths */
+.table th:nth-child(1) { width: 90px; }   /* APP ID */
+.table th:nth-child(2) { width: 140px; }  /* FAMILY NAME */
+.table th:nth-child(3) { width: 180px; }  /* EMAIL */
+.table th:nth-child(4) { width: 120px; }  /* DECEASED */
+.table th:nth-child(5) { width: 110px; }  /* PLOT */
+.table th:nth-child(6) { width: 95px; }   /* BURIAL DATE */
+.table th:nth-child(7) { width: 130px; }  /* TIME */
+.table th:nth-child(8) { width: 115px; }  /* CONTACT */
+.table th:nth-child(9) { width: 85px; }   /* STATUS */
+.table th:nth-child(10) { width: 170px; } /* ACTIONS */
+
 .table td {
-  padding: 14px 18px;
-  font-size: 0.85rem;
+  padding: 12px 14px;
+  font-size: 0.82rem;
   border-bottom: 1px solid var(--admin-border-subtle);
   color: var(--admin-text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Allow name & email columns to wrap if needed */
+.table td:nth-child(2),
+.table td:nth-child(3),
+.table td:nth-child(4) {
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* Keep time column on one line */
+.table td:nth-child(7) {
+  white-space: nowrap;
+  font-size: 0.78rem;
 }
 
 .appId {
   font-family: monospace;
   background: var(--admin-input-bg);
-  padding: 4px 8px;
+  padding: 3px 7px;
   border-radius: 12px;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   color: #E2C97E;
   border: 1px solid rgba(200, 168, 75, 0.25);
   display: inline-block;
+  white-space: nowrap;
 }
 
 .badge {
