@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import styles from './page.module.css';
-import { getInquiries, updateInquiryStatus } from '../../../actions/inquiry';
+import { getInquiries, acceptInquiry, updateInquiryStatus } from '../../../actions/inquiry';
 
 interface Inquiry {
   id: number;
@@ -30,6 +30,7 @@ export default function InquiriesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Modals & action states
   const [modalOpen, setModalOpen] = useState(false);
   const [currentInquiryId, setCurrentInquiryId] = useState<number | null>(null);
   const [statusSelect, setStatusSelect] = useState('pending');
@@ -37,10 +38,18 @@ export default function InquiriesPage() {
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewInquiryId, setViewInquiryId] = useState<number | null>(null);
 
+  const [processingId, setProcessingId] = useState<number | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
+
   const itemsPerPage = 10;
 
+  const showToast = (message: string, type: 'success' | 'warning' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 6000);
+  };
+
   const loadInquiries = async () => {
-    // Legacy load
+    // Legacy localStorage load
     const saved = localStorage.getItem('inquiries');
     let localData: any[] = [];
     if (saved) {
@@ -104,13 +113,19 @@ export default function InquiriesPage() {
   useEffect(() => {
     let result = inquiries;
     if (currentFilter !== 'all') {
-      result = result.filter(app => app.status === currentFilter);
+      result = result.filter(app => {
+        if (currentFilter === 'accepted' || currentFilter === 'confirmed') {
+          return app.status === 'accepted' || app.status === 'confirmed';
+        }
+        return app.status === currentFilter;
+      });
     }
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(app =>
         (app.fullName?.toLowerCase().includes(term)) ||
         (app.ref?.toLowerCase().includes(term)) ||
+        (app.email?.toLowerCase().includes(term)) ||
         (app.deceased?.toLowerCase().includes(term))
       );
     }
@@ -119,8 +134,8 @@ export default function InquiriesPage() {
 
   const countAll = inquiries.length;
   const countPending = inquiries.filter(a => a.status === 'pending').length;
+  const countAccepted = inquiries.filter(a => a.status === 'accepted' || a.status === 'confirmed').length;
   const countInprogress = inquiries.filter(a => a.status === 'inprogress').length;
-  const countConfirmed = inquiries.filter(a => a.status === 'confirmed').length;
   const countCancelled = inquiries.filter(a => a.status === 'cancelled').length;
 
   const totalFiltered = filteredInquiries.length;
@@ -131,10 +146,15 @@ export default function InquiriesPage() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'confirmed': return <span className={`${styles.badge} ${styles.badgeConfirmed}`}>Confirmed</span>;
-      case 'inprogress': return <span className={`${styles.badge} ${styles.badgeInprogress}`}>In Progress</span>;
-      case 'cancelled': return <span className={`${styles.badge} ${styles.badgeCancelled}`}>Cancelled</span>;
-      default: return <span className={`${styles.badge} ${styles.badgePending}`}>Pending</span>;
+      case 'accepted':
+      case 'confirmed':
+        return <span className={`${styles.badge} ${styles.badgeAccepted}`}>Accepted</span>;
+      case 'inprogress':
+        return <span className={`${styles.badge} ${styles.badgeInprogress}`}>In Progress</span>;
+      case 'cancelled':
+        return <span className={`${styles.badge} ${styles.badgeCancelled}`}>Cancelled</span>;
+      default:
+        return <span className={`${styles.badge} ${styles.badgePending}`}>Pending</span>;
     }
   };
 
@@ -152,40 +172,116 @@ export default function InquiriesPage() {
     setModalOpen(true);
   };
 
-  const updateStatus = async () => {
+  /**
+   * Direct Accept / Approve Handler:
+   * 1. Updates inquiry status to 'Accepted'.
+   * 2. Automatically triggers email sending to user's stored email.
+   * 3. Prevents duplicate calls.
+   */
+  const handleAcceptDirect = async (id: number) => {
+    const target = inquiries.find(a => a.id === id);
+    if (!target) return;
+
+    if (target.status === 'accepted' || target.status === 'confirmed') {
+      showToast(`Inquiry ${target.ref} is already accepted.`, 'warning');
+      return;
+    }
+
+    setProcessingId(id);
+
+    try {
+      const res = await acceptInquiry(id);
+
+      if (res.success) {
+        // Update local state
+        setInquiries(prev =>
+          prev.map(item =>
+            item.id === id ? { ...item, status: 'accepted' } : item
+          )
+        );
+
+        // Update local storage backup
+        try {
+          const raw = localStorage.getItem('inquiries');
+          if (raw) {
+            const list = JSON.parse(raw);
+            const updated = list.map((item: any) =>
+              item.id === id ? { ...item, status: 'accepted' } : item
+            );
+            localStorage.setItem('inquiries', JSON.stringify(updated));
+          }
+        } catch (e) {}
+
+        if (res.emailSent) {
+          showToast(`✅ Inquiry accepted successfully. An acceptance email has been sent to ${target.email}.`, 'success');
+        } else {
+          showToast(`✅ Inquiry accepted successfully. (Email notice: ${res.emailError || 'Email could not be delivered.'})`, 'warning');
+        }
+      } else {
+        showToast(res.message || 'Failed to accept inquiry.', 'warning');
+      }
+    } catch (e: any) {
+      showToast(e.message || 'An error occurred while accepting inquiry.', 'warning');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const updateStatusFromModal = async () => {
     if (!currentInquiryId) return;
     const index = inquiries.findIndex(a => a.id === currentInquiryId);
     if (index !== -1 && inquiries[index]) {
       const target = inquiries[index] as Inquiry;
       const oldStatus = target.status;
-      const updated = [...inquiries];
-      updated[index] = { ...target, status: statusSelect };
-      setInquiries(updated);
-      
-      // Try to update in DB first, if it fails, fallback to local storage
-      if (currentInquiryId.toString().length < 10) { 
-        // Using length check since DB id is Int, local id is Date.now()
-        await updateInquiryStatus(currentInquiryId, statusSelect);
-      } else {
-        localStorage.setItem('inquiries', JSON.stringify(updated));
-      }
 
-      if (oldStatus !== statusSelect) {
-        let notifications = [];
-        try {
-          notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
-        } catch (e) {}
-        notifications.push({
-          id: Date.now(),
-          type: 'status_change',
-          message: `Inquiry ${updated[index].ref} status changed from ${oldStatus} to ${statusSelect}`,
-          ref: updated[index].ref,
-          read: false,
-          timestamp: new Date().toISOString()
-        });
-        localStorage.setItem('notifications', JSON.stringify(notifications));
+      setProcessingId(currentInquiryId);
+
+      try {
+        if (statusSelect === 'accepted' || statusSelect === 'confirmed') {
+          const res = await acceptInquiry(currentInquiryId);
+          if (res.success) {
+            const updated = [...inquiries];
+            updated[index] = { ...target, status: 'accepted' };
+            setInquiries(updated);
+
+            if (res.emailSent) {
+              showToast(`✅ Inquiry accepted successfully. An acceptance email has been sent to ${target.email}.`, 'success');
+            } else {
+              showToast(`✅ Inquiry accepted. (Email notice: ${res.emailError || 'Email could not be sent.'})`, 'warning');
+            }
+          } else {
+            showToast(res.message || 'Failed to accept inquiry.', 'warning');
+          }
+        } else {
+          const res = await updateInquiryStatus(currentInquiryId, statusSelect);
+          if (res.success) {
+            const updated = [...inquiries];
+            updated[index] = { ...target, status: statusSelect };
+            setInquiries(updated);
+            showToast(`Status updated to ${statusSelect}.`, 'success');
+          }
+        }
+
+        if (oldStatus !== statusSelect) {
+          let notifications = [];
+          try {
+            notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+          } catch (e) {}
+          notifications.push({
+            id: Date.now(),
+            type: 'status_change',
+            message: `Inquiry ${target.ref} status changed from ${oldStatus} to ${statusSelect}`,
+            ref: target.ref,
+            read: false,
+            timestamp: new Date().toISOString()
+          });
+          localStorage.setItem('notifications', JSON.stringify(notifications));
+        }
+      } catch (e: any) {
+        showToast(e.message || 'Failed to update status', 'warning');
+      } finally {
+        setProcessingId(null);
       }
-      alert('Status updated successfully!');
     }
     setModalOpen(false);
   };
@@ -195,9 +291,9 @@ export default function InquiriesPage() {
       alert('No inquiries to export.');
       return;
     }
-    const headers = ['REF. NO.', 'FULL NAME', 'DECEASED', 'PLOT', 'DATE', 'TIME', 'CONTACT', 'STATUS', 'EMAIL', 'RELATION', 'NOTES'];
+    const headers = ['REF. NO.', 'FULL NAME', 'EMAIL', 'CONTACT', 'DECEASED', 'PLOT', 'DATE', 'TIME', 'STATUS', 'RELATION', 'NOTES'];
     const rows = inquiries.map(a => [
-      a.ref, a.fullName, a.deceased, a.plot, a.preferredDate, a.preferredTime, a.phone, a.status, a.email, a.relation, a.notes
+      a.ref, a.fullName, a.email, a.phone, a.deceased, a.plot, a.preferredDate, a.preferredTime, a.status, a.relation, a.notes
     ].map(cell => `"${(cell || '').replace(/"/g, '""')}"`).join(','));
 
     const csv = [headers.map(h => `"${h}"`).join(','), ...rows].join('\n');
@@ -211,8 +307,23 @@ export default function InquiriesPage() {
 
   return (
     <div style={{ padding: '0 10px' }}>
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`${styles.toastBanner} ${toast.type === 'success' ? styles.toastSuccess : styles.toastWarning}`}>
+          <span>{toast.type === 'success' ? '📩' : 'ℹ️'}</span>
+          <div style={{ flex: 1 }}>{toast.message}</div>
+          <button
+            onClick={() => setToast(null)}
+            style={{ background: 'none', border: 'none', color: '#9c9588', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}
+          >
+            &times;
+          </button>
+        </div>
+      )}
+
       <div className={styles.pageHeader}>
         <h3>Inquiry Management</h3>
+        <p>Review submitted citizen inquiries and approve booking schedules with automatic email notifications.</p>
       </div>
 
       <div className={styles.statusTabs}>
@@ -222,11 +333,11 @@ export default function InquiriesPage() {
         <div className={`${styles.statusTab} ${currentFilter === 'pending' ? styles.statusTabActive : ''}`} onClick={() => { setCurrentFilter('pending'); setCurrentPage(1); }}>
           Pending <span>{countPending}</span>
         </div>
+        <div className={`${styles.statusTab} ${currentFilter === 'accepted' ? styles.statusTabActive : ''}`} onClick={() => { setCurrentFilter('accepted'); setCurrentPage(1); }}>
+          Accepted <span>{countAccepted}</span>
+        </div>
         <div className={`${styles.statusTab} ${currentFilter === 'inprogress' ? styles.statusTabActive : ''}`} onClick={() => { setCurrentFilter('inprogress'); setCurrentPage(1); }}>
           In progress <span>{countInprogress}</span>
-        </div>
-        <div className={`${styles.statusTab} ${currentFilter === 'confirmed' ? styles.statusTabActive : ''}`} onClick={() => { setCurrentFilter('confirmed'); setCurrentPage(1); }}>
-          Confirmed <span>{countConfirmed}</span>
         </div>
         <div className={`${styles.statusTab} ${currentFilter === 'cancelled' ? styles.statusTabActive : ''}`} onClick={() => { setCurrentFilter('cancelled'); setCurrentPage(1); }}>
           Cancelled <span>{countCancelled}</span>
@@ -239,13 +350,13 @@ export default function InquiriesPage() {
           <div className={styles.panelActions}>
             <input
               type="text"
-              placeholder="Search..."
+              placeholder="Search name, email, ref..."
               className={styles.searchInput}
               value={searchTerm}
               onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             />
             <button className={styles.btnOutline} style={{ display: 'flex', alignItems: 'center' }} onClick={exportInquiries}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'8px'}}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'8px'}}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Export
             </button>
             <button className={styles.btnOutline} style={{ display: 'flex', alignItems: 'center' }} onClick={loadInquiries}>
@@ -261,19 +372,20 @@ export default function InquiriesPage() {
               <tr>
                 <th>APP. ID</th>
                 <th>FAMILY NAME</th>
+                <th>EMAIL</th>
                 <th>DECEASED</th>
                 <th>REQUESTED PLOT</th>
                 <th>BURIAL DATE</th>
                 <th>TIME</th>
                 <th>CONTACT</th>
                 <th>STATUS</th>
-                <th>ACTIONS</th>
+                <th style={{ textAlign: 'center' }}>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               {totalFiltered === 0 ? (
                 <tr>
-                  <td colSpan={9} className={styles.emptyState}>
+                  <td colSpan={10} className={styles.emptyState}>
                     <div className={styles.icon} style={{ display: 'flex', justifyContent: 'center', marginBottom: '15px' }}>
                       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
                     </div>
@@ -282,28 +394,76 @@ export default function InquiriesPage() {
                   </td>
                 </tr>
               ) : (
-                pageItems.map(app => (
-                  <tr key={app.id}>
-                    <td><span className={styles.appId}>{app.ref || '—'}</span></td>
-                    <td>{app.fullName || '—'}</td>
-                    <td>{app.deceased || '—'}</td>
-                    <td>{app.plot || '—'}</td>
-                    <td>{app.formattedDate || app.preferredDate || '—'}</td>
-                    <td>{app.preferredTime || '—'}</td>
-                    <td>{app.phone || '—'}</td>
-                    <td>{getStatusBadge(app.status)}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button className={styles.actionBtn} onClick={() => viewDetails(app.id)} title="View Details" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                        </button>
-                        <button className={styles.actionBtn} onClick={() => openStatusModal(app.id)} title="Update Status" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.839a.5.5 0 0 1-.62-.62l.84-2.871a2 2 0 0 1 .506-.854z"/></svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                pageItems.map(app => {
+                  const isAccepted = app.status === 'accepted' || app.status === 'confirmed';
+                  const isProcessing = processingId === app.id;
+
+                  return (
+                    <tr key={app.id}>
+                      <td><span className={styles.appId}>{app.ref || '—'}</span></td>
+                      <td><strong>{app.fullName || '—'}</strong></td>
+                      <td>
+                        <span style={{ color: '#c8a84b', fontSize: '0.82rem', fontFamily: 'monospace' }}>
+                          {app.email || '—'}
+                        </span>
+                      </td>
+                      <td>{app.deceased || '—'}</td>
+                      <td>{app.plot || '—'}</td>
+                      <td>{app.formattedDate || app.preferredDate || '—'}</td>
+                      <td>{app.preferredTime || '—'}</td>
+                      <td>{app.phone || '—'}</td>
+                      <td>{getStatusBadge(app.status)}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'center' }}>
+                          {/* Direct Accept Action */}
+                          {!isAccepted ? (
+                            <button
+                              className={styles.btnAccept}
+                              onClick={() => handleAcceptDirect(app.id)}
+                              disabled={isProcessing}
+                              title={`Accept inquiry & send confirmation email to ${app.email}`}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12"/>
+                              </svg>
+                              {isProcessing ? 'Accepting…' : 'Accept'}
+                            </button>
+                          ) : (
+                            <span className={styles.btnAccepted} title="Inquiry is accepted">
+                              ✓ Accepted
+                            </span>
+                          )}
+
+                          {/* View Details */}
+                          <button
+                            className={styles.actionBtn}
+                            onClick={() => viewDetails(app.id)}
+                            title="View Full Details"
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+                              <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                          </button>
+
+                          {/* Status Review Modal */}
+                          <button
+                            className={styles.actionBtn}
+                            onClick={() => openStatusModal(app.id)}
+                            title="Change Status / Review"
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 20h9"/>
+                              <path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.839a.5.5 0 0 1-.62-.62l.84-2.871a2 2 0 0 1 .506-.854z"/>
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -326,14 +486,15 @@ export default function InquiriesPage() {
       </div>
 
       <div style={{ color: '#7A7570', fontSize: '0.75rem', textAlign: 'right' }}>
-        <span>Connected to User Inquiry System · Live updates</span>
+        <span>Connected to User Inquiry System · Automatic Email Notification Enabled</span>
       </div>
 
+      {/* Review / Status Modal */}
       {modalOpen && (
         <div className={styles.modalOverlay} onClick={(e) => { if (e.target === e.currentTarget) setModalOpen(false); }}>
-          <div className={styles.modal} style={{ maxWidth: '500px', width: '90%' }}>
+          <div className={styles.modal} style={{ maxWidth: '520px', width: '90%' }}>
             <div className={styles.modalHeader}>
-              <h3>Review Inquiry</h3>
+              <h3>Review & Update Inquiry</h3>
               <span className={styles.modalClose} onClick={() => setModalOpen(false)}>&times;</span>
             </div>
             <div className={styles.modalBody}>
@@ -344,13 +505,13 @@ export default function InquiriesPage() {
                   <>
                     <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: 'var(--admin-panel-bg)', borderRadius: '8px', border: '1px solid var(--admin-border)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
-                        <h4 style={{ margin: 0, color: 'var(--admin-header-text)', fontSize: '1.2rem' }}>{app.fullName}</h4>
+                        <h4 style={{ margin: 0, color: 'var(--admin-header-text)', fontSize: '1.15rem' }}>{app.fullName}</h4>
                         <span style={{ fontSize: '0.8rem', padding: '3px 8px', borderRadius: '4px', backgroundColor: 'var(--admin-input-bg)', color: 'var(--admin-text-main)', border: '1px solid var(--admin-input-border)' }}>{app.ref}</span>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.9rem', color: 'var(--admin-text-main)' }}>
-                        <div><strong style={{ color: 'var(--admin-text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px' }}>CONTACT</strong> {app.phone}</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.88rem', color: 'var(--admin-text-main)' }}>
                         <div><strong style={{ color: 'var(--admin-text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px' }}>EMAIL</strong> {app.email || '—'}</div>
+                        <div><strong style={{ color: 'var(--admin-text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px' }}>CONTACT</strong> {app.phone}</div>
                         <div style={{ gridColumn: '1 / -1' }}><strong style={{ color: 'var(--admin-text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px' }}>SCHEDULE</strong> {app.formattedDate || app.preferredDate} at {app.preferredTime}</div>
                         <div style={{ gridColumn: '1 / -1' }}><strong style={{ color: 'var(--admin-text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px' }}>DECEASED</strong> {app.deceased} ({app.relation}) - Plot: {app.plot}</div>
                         <div style={{ gridColumn: '1 / -1', padding: '10px', backgroundColor: 'var(--admin-border-subtle)', borderRadius: '5px', border: '1px solid var(--admin-border)' }}>
@@ -361,14 +522,14 @@ export default function InquiriesPage() {
                       </div>
                     </div>
 
-                    <label style={{ display: 'block', marginBottom: '12px', fontWeight: 'bold', fontSize: '0.9rem', color: '#c9a84c' }}>ACTION REQUIRED:</label>
+                    <label style={{ display: 'block', marginBottom: '12px', fontWeight: 'bold', fontSize: '0.9rem', color: '#c9a84c' }}>SELECT ACTION / STATUS:</label>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                       <button
-                        style={{ padding: '12px', border: '1px solid #4ade80', backgroundColor: statusSelect === 'confirmed' ? '#4ade80' : 'transparent', color: statusSelect === 'confirmed' ? '#000' : '#4ade80', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        onClick={() => setStatusSelect('confirmed')}
+                        style={{ padding: '12px', border: '1px solid #4ade80', backgroundColor: (statusSelect === 'accepted' || statusSelect === 'confirmed') ? '#4ade80' : 'transparent', color: (statusSelect === 'accepted' || statusSelect === 'confirmed') ? '#000' : '#4ade80', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        onClick={() => setStatusSelect('accepted')}
                       >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'6px'}}><polyline points="20 6 9 17 4 12"/></svg>
-                        Confirm
+                        Accept & Email
                       </button>
                       <button
                         style={{ padding: '12px', border: '1px solid #facc15', backgroundColor: statusSelect === 'inprogress' ? '#facc15' : 'transparent', color: statusSelect === 'inprogress' ? '#000' : '#facc15', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
@@ -392,21 +553,30 @@ export default function InquiriesPage() {
                         Pending
                       </button>
                     </div>
+
+                    {(statusSelect === 'accepted' || statusSelect === 'confirmed') && (
+                      <div style={{ marginTop: '12px', padding: '8px 12px', backgroundColor: 'rgba(74, 222, 128, 0.1)', border: '1px solid rgba(74, 222, 128, 0.3)', borderRadius: '6px', fontSize: '0.8rem', color: '#a5d6a7' }}>
+                        📧 An automated confirmation email will be sent to <strong>{app.email}</strong> upon saving.
+                      </div>
+                    )}
                   </>
                 );
               })()}
             </div>
             <div className={styles.modalActions} style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid var(--admin-border)' }}>
-              <button className={styles.btnOutline} onClick={() => setModalOpen(false)}>Close Without Saving</button>
-              <button className={styles.btnGold} onClick={updateStatus}>Save Validation</button>
+              <button className={styles.btnOutline} onClick={() => setModalOpen(false)}>Cancel</button>
+              <button className={styles.btnGold} onClick={updateStatusFromModal} disabled={processingId !== null}>
+                {processingId !== null ? 'Saving…' : 'Save Status'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* View Details Modal */}
       {viewModalOpen && (
         <div className={styles.modalOverlay} onClick={(e) => { if (e.target === e.currentTarget) setViewModalOpen(false); }}>
-          <div className={styles.modal} style={{ maxWidth: '600px', width: '90%' }}>
+          <div className={styles.modal} style={{ maxWidth: '620px', width: '90%' }}>
             <div className={styles.modalHeader}>
               <h3>Inquiry Details</h3>
               <span className={styles.modalClose} onClick={() => setViewModalOpen(false)}>&times;</span>
@@ -415,52 +585,79 @@ export default function InquiriesPage() {
               {(() => {
                 const app = inquiries.find(a => a.id === viewInquiryId);
                 if (!app) return null;
+                const isAccepted = app.status === 'accepted' || app.status === 'confirmed';
+
                 return (
                   <div style={{ color: 'var(--admin-text-main)', lineHeight: '1.6' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '15px', borderBottom: '1px solid var(--admin-border)' }}>
                       <div>
-                        <h2 style={{ margin: '0 0 5px 0', color: 'var(--admin-header-text)' }}>{app.fullName}</h2>
-                        <span style={{ fontSize: '0.85rem', color: 'var(--admin-text-muted)' }}>Submitted: {app.submittedAt ? new Date(app.submittedAt).toLocaleString() : '—'}</span>
+                        <h2 style={{ margin: '0 0 5px 0', color: 'var(--admin-header-text)', fontSize: '1.3rem' }}>{app.fullName}</h2>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--admin-text-muted)' }}>
+                          Reference ID: <strong style={{ color: '#c8a84b' }}>{app.ref}</strong> · Submitted: {app.submittedAt ? new Date(app.submittedAt).toLocaleString() : '—'}
+                        </span>
                       </div>
                       {getStatusBadge(app.status)}
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                       <div style={{ backgroundColor: 'var(--admin-panel-bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--admin-border)' }}>
-                        <h4 style={{ margin: '0 0 10px 0', color: 'var(--admin-header-text)', borderBottom: '1px solid var(--admin-border)', paddingBottom: '5px' }}>Contact Info</h4>
-                        <div style={{ fontSize: '0.9rem' }}><strong style={{ color: 'var(--admin-text-muted)' }}>Email:</strong> {app.email || '—'}</div>
-                        <div style={{ fontSize: '0.9rem' }}><strong style={{ color: 'var(--admin-text-muted)' }}>Phone:</strong> {app.phone || '—'}</div>
+                        <h4 style={{ margin: '0 0 10px 0', color: 'var(--admin-header-text)', borderBottom: '1px solid var(--admin-border)', paddingBottom: '5px' }}>Contact Information</h4>
+                        <div style={{ fontSize: '0.9rem', marginBottom: '4px' }}><strong style={{ color: 'var(--admin-text-muted)' }}>Email:</strong> <span style={{ color: '#c8a84b' }}>{app.email || '—'}</span></div>
+                        <div style={{ fontSize: '0.9rem', marginBottom: '4px' }}><strong style={{ color: 'var(--admin-text-muted)' }}>Phone:</strong> {app.phone || '—'}</div>
                         <div style={{ fontSize: '0.9rem' }}><strong style={{ color: 'var(--admin-text-muted)' }}>Address:</strong> {app.address || '—'}</div>
                       </div>
 
                       <div style={{ backgroundColor: 'var(--admin-panel-bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--admin-border)' }}>
-                        <h4 style={{ margin: '0 0 10px 0', color: 'var(--admin-header-text)', borderBottom: '1px solid var(--admin-border)', paddingBottom: '5px' }}>Deceased Info</h4>
-                        <div style={{ fontSize: '0.9rem' }}><strong style={{ color: 'var(--admin-text-muted)' }}>Name:</strong> {app.deceased || '—'}</div>
-                        <div style={{ fontSize: '0.9rem' }}><strong style={{ color: 'var(--admin-text-muted)' }}>Relation:</strong> {app.relation || '—'}</div>
+                        <h4 style={{ margin: '0 0 10px 0', color: 'var(--admin-header-text)', borderBottom: '1px solid var(--admin-border)', paddingBottom: '5px' }}>Deceased & Plot Details</h4>
+                        <div style={{ fontSize: '0.9rem', marginBottom: '4px' }}><strong style={{ color: 'var(--admin-text-muted)' }}>Deceased:</strong> {app.deceased || '—'}</div>
+                        <div style={{ fontSize: '0.9rem', marginBottom: '4px' }}><strong style={{ color: 'var(--admin-text-muted)' }}>Relation:</strong> {app.relation || '—'}</div>
                         <div style={{ fontSize: '0.9rem' }}><strong style={{ color: 'var(--admin-text-muted)' }}>Plot:</strong> {app.plot || '—'}</div>
                       </div>
                     </div>
 
                     <div style={{ backgroundColor: 'var(--admin-panel-bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--admin-border)' }}>
-                      <h4 style={{ margin: '0 0 10px 0', color: 'var(--admin-header-text)', borderBottom: '1px solid var(--admin-border)', paddingBottom: '5px' }}>Inquiry Request</h4>
+                      <h4 style={{ margin: '0 0 10px 0', color: 'var(--admin-header-text)', borderBottom: '1px solid var(--admin-border)', paddingBottom: '5px' }}>Inquiry Request & Schedule</h4>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                        <div style={{ fontSize: '0.9rem' }}><strong style={{ color: 'var(--admin-text-muted)' }}>Date:</strong> {app.formattedDate || app.preferredDate || '—'}</div>
-                        <div style={{ fontSize: '0.9rem' }}><strong style={{ color: 'var(--admin-text-muted)' }}>Time:</strong> {app.preferredTime || '—'}</div>
-                        <div style={{ gridColumn: '1 / -1', fontSize: '0.9rem' }}><strong style={{ color: 'var(--admin-text-muted)' }}>Reason:</strong> {app.reason || '—'}</div>
+                        <div style={{ fontSize: '0.9rem' }}><strong style={{ color: 'var(--admin-text-muted)' }}>Request Type:</strong> {app.reason || '—'}</div>
+                        <div style={{ fontSize: '0.9rem' }}><strong style={{ color: 'var(--admin-text-muted)' }}>Schedule:</strong> {app.formattedDate || app.preferredDate || '—'} at {app.preferredTime || '—'}</div>
                         <div style={{ gridColumn: '1 / -1', fontSize: '0.9rem', marginTop: '5px' }}>
-                          <strong style={{ color: 'var(--admin-text-muted)', display: 'block' }}>Additional Notes:</strong>
-                          <p style={{ margin: '5px 0 0 0', padding: '10px', backgroundColor: 'var(--admin-border-subtle)', borderRadius: '4px', fontStyle: 'italic', fontSize: '0.85rem', color: 'var(--admin-text-muted)', border: '1px solid var(--admin-border)' }}>
+                          <strong style={{ color: 'var(--admin-text-muted)', display: 'block', marginBottom: '4px' }}>Additional Notes:</strong>
+                          <p style={{ margin: '0', padding: '10px', backgroundColor: 'var(--admin-border-subtle)', borderRadius: '4px', fontStyle: 'italic', fontSize: '0.85rem', color: 'var(--admin-text-muted)', border: '1px solid var(--admin-border)' }}>
                             {app.notes || 'No additional notes provided.'}
                           </p>
                         </div>
                       </div>
                     </div>
+
+                    <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      {!isAccepted ? (
+                        <button
+                          className={styles.btnAccept}
+                          style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+                          onClick={() => {
+                            setViewModalOpen(false);
+                            handleAcceptDirect(app.id);
+                          }}
+                          disabled={processingId !== null}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                          Accept Inquiry & Send Email
+                        </button>
+                      ) : (
+                        <span className={styles.btnAccepted} style={{ padding: '6px 14px', fontSize: '0.82rem' }}>
+                          ✓ Inquiry Accepted
+                        </span>
+                      )}
+
+                      <button className={styles.btnGold} onClick={() => setViewModalOpen(false)}>
+                        Close
+                      </button>
+                    </div>
                   </div>
                 );
               })()}
-            </div>
-            <div className={styles.modalActions} style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid var(--admin-border)', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button className={styles.btnGold} onClick={() => setViewModalOpen(false)}>Close</button>
             </div>
           </div>
         </div>
