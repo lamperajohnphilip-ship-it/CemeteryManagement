@@ -321,7 +321,7 @@
 .table th:nth-child(9) { width: 90px; }   /* PAID */
 .table th:nth-child(10) { width: 90px; }  /* BALANCE */
 .table th:nth-child(11) { width: 95px; }  /* STATUS */
-.table th:nth-child(12) { width: 185px; } /* ACTIONS */
+.table th:nth-child(12) { width: 230px; } /* ACTIONS */
 
 .table th:hover {
   color: #E2C97E;
@@ -529,6 +529,19 @@
   background: rgba(2, 136, 209, 0.15);
   border-color: #0288d1;
   color: #90caf9;
+}
+
+.btnDeleteAction {
+  background: rgba(211, 47, 47, 0.08);
+  border: 1px solid rgba(211, 47, 47, 0.3);
+  color: #ef9a9a;
+}
+
+.btnDeleteAction:hover {
+  background: rgba(211, 47, 47, 0.22);
+  border-color: #ef5350;
+  color: #ffcdd2;
+  transform: translateY(-1px);
 }
 
 .btnHist:hover {

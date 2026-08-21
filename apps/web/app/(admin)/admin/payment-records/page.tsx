@@ -42,6 +42,10 @@ export default function PaymentsPage() {
   const [generateYear, setGenerateYear] = useState('all');
   const [currentReceipt, setCurrentReceipt] = useState<PaymentRecord | null>(null);
 
+  // Delete State
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<PaymentRecord | null>(null);
+
   // Update Balance States
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [currentUpdateRecord, setCurrentUpdateRecord] = useState<PaymentRecord | null>(null);
@@ -139,6 +143,14 @@ export default function PaymentsPage() {
       }
     }
 
+    // Exclude previously deleted records
+    let deletedIds: string[] = [];
+    try {
+      deletedIds = JSON.parse(localStorage.getItem('deletedPaymentIds') || '[]');
+    } catch (e) {}
+
+    localPayments = localPayments.filter(p => !deletedIds.includes(p.id) && !deletedIds.includes(p.ref));
+
     if (localPayments.length > 0) {
       const parsed = localPayments.map((p: any) => ({ ...p, status: getComputedStatus(p) }));
       setPayments(parsed);
@@ -149,7 +161,7 @@ export default function PaymentsPage() {
         { id: '1', payorName: 'Juan Dela Cruz', deceasedName: 'Maria Dela Cruz', orNo: 'OR-2026-0001', amountDue: 500, amountPaid: 500, datePaid: '2026-03-01', method: 'Cash', yearCovered: '2026', dueDate: '2026-03-15', remarks: '', status: 'paid', ref: 'PAY-1001' },
         { id: '2', payorName: 'Maria Santos', deceasedName: 'Pedro Santos', orNo: 'OR-2026-0002', amountDue: 750, amountPaid: 400, datePaid: '2026-02-15', method: 'GCash', yearCovered: '2026', dueDate: '2026-02-28', remarks: 'Partial payment', status: 'overdue', ref: 'PAY-1002' },
         { id: '3', payorName: 'Jose Rodriguez', deceasedName: 'Ana Rodriguez', orNo: '', amountDue: 600, amountPaid: 0, datePaid: '', method: '', yearCovered: '2025', dueDate: '2025-12-15', remarks: '', status: 'overdue', ref: 'PAY-1003' },
-      ];
+      ].filter(p => !deletedIds.includes(p.id) && !deletedIds.includes(p.ref));
       setPayments(mockPayments);
       setFilteredPayments(mockPayments);
       localStorage.setItem('cemeteryPayments', JSON.stringify(mockPayments));
@@ -350,6 +362,43 @@ export default function PaymentsPage() {
     setCurrentUpdateRecord(null);
   };
 
+  const openDeleteModal = (record: PaymentRecord) => {
+    setRecordToDelete(record);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeletePayment = () => {
+    if (!recordToDelete) return;
+    const target = recordToDelete;
+
+    let deletedIds: string[] = [];
+    try {
+      deletedIds = JSON.parse(localStorage.getItem('deletedPaymentIds') || '[]');
+    } catch (e) {}
+    if (!deletedIds.includes(target.id)) deletedIds.push(target.id);
+    if (target.ref && !deletedIds.includes(target.ref)) deletedIds.push(target.ref);
+    localStorage.setItem('deletedPaymentIds', JSON.stringify(deletedIds));
+
+    const updated = payments.filter(p => p.id !== target.id && p.ref !== target.ref);
+    setPayments(updated);
+    setFilteredPayments(prev => prev.filter(p => p.id !== target.id && p.ref !== target.ref));
+    localStorage.setItem('cemeteryPayments', JSON.stringify(updated));
+
+    // Add to Audit Log
+    setAuditLogs(prev => [
+      {
+        ts: new Date().toISOString(),
+        user: 'Admin Jasaan',
+        action: `Deleted payment record ${target.ref} (${target.payorName} / ${target.deceasedName})`
+      },
+      ...prev
+    ]);
+
+    setShowDeleteModal(false);
+    setShowUpdateModal(false);
+    setRecordToDelete(null);
+  };
+
   const handleGenerateReport = () => {
     const uniqueResult: PaymentRecord[] = [];
     const seen = new Set();
@@ -467,6 +516,17 @@ export default function PaymentsPage() {
                       </button>}
                       <button className={styles.actionBtn} style={{ color: '#ffb74d', display: 'flex', alignItems: 'center' }} onClick={() => openUpdatePayment(p)}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'4px'}}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg> Manage Balance
+                      </button>
+                      <button
+                        className={`${styles.actionBtn} ${styles.btnDeleteAction}`}
+                        style={{ display: 'flex', alignItems: 'center' }}
+                        onClick={() => openDeleteModal(p)}
+                        title="Delete Payment Record"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'3px'}}>
+                          <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                        </svg>
+                        Delete
                       </button>
                     </div>
                   </td>
@@ -777,8 +837,58 @@ export default function PaymentsPage() {
               </div>
             </div>
             <div className={styles.modalFooter}>
+              <button
+                type="button"
+                className={styles.btnDanger}
+                style={{ marginRight: 'auto' }}
+                onClick={() => {
+                  setShowUpdateModal(false);
+                  if (currentUpdateRecord) openDeleteModal(currentUpdateRecord);
+                }}
+              >
+                🗑 Delete Record
+              </button>
               <button className={styles.btnOutline} onClick={() => setShowUpdateModal(false)}>Cancel</button>
               <button className={styles.btnGold} onClick={handleUpdatePayment}>SAVE CHANGES</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Payment Confirmation Modal */}
+      {showDeleteModal && recordToDelete && (
+        <div className={styles.modalOverlay} onClick={e => { if (e.target === e.currentTarget) setShowDeleteModal(false); }}>
+          <div className={styles.modalContent} style={{ maxWidth: '440px' }}>
+            <div className={styles.modalHeader}>
+              <h3 style={{ color: '#ef5350', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef5350" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                Delete Payment Record
+              </h3>
+              <span className={styles.modalClose} onClick={() => setShowDeleteModal(false)}>&times;</span>
+            </div>
+            <div className={styles.modalBody}>
+              <p style={{ color: 'var(--admin-text-main)', fontSize: '0.95rem', marginBottom: '14px', lineHeight: 1.5 }}>
+                Are you sure you want to permanently delete this payment transaction?
+              </p>
+              <div style={{ padding: '14px', backgroundColor: 'var(--admin-input-bg)', border: '1px solid var(--admin-input-border)', borderRadius: '8px', fontSize: '0.85rem', lineHeight: '1.6' }}>
+                <div><strong style={{ color: 'var(--admin-text-muted)' }}>Reference:</strong> <span style={{ color: '#E2C97E', fontFamily: 'monospace' }}>{recordToDelete.ref}</span></div>
+                <div><strong style={{ color: 'var(--admin-text-muted)' }}>Payor:</strong> {recordToDelete.payorName}</div>
+                <div><strong style={{ color: 'var(--admin-text-muted)' }}>Deceased:</strong> {recordToDelete.deceasedName}</div>
+                <div><strong style={{ color: 'var(--admin-text-muted)' }}>Amount Paid:</strong> ₱{recordToDelete.amountPaid.toLocaleString()}</div>
+                <div><strong style={{ color: 'var(--admin-text-muted)' }}>Year:</strong> {recordToDelete.yearCovered}</div>
+              </div>
+              <p style={{ color: '#ef9a9a', fontSize: '0.78rem', marginTop: '12px', marginBottom: '0' }}>
+                ⚠️ This action will remove the record from your active transactions log.
+              </p>
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.btnOutline} onClick={() => setShowDeleteModal(false)}>Cancel</button>
+              <button className={styles.btnDanger} onClick={confirmDeletePayment}>
+                🗑 Delete Record
+              </button>
             </div>
           </div>
         </div>
