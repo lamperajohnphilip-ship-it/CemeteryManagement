@@ -2,7 +2,7 @@
 
 import { prisma } from '../../lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { sendInquiryAcceptanceEmail } from '../../lib/email';
+import { sendInquiryAcceptanceEmail, sendInquiryReceivedEmail } from '../../lib/email';
 
 export async function submitInquiry(data: {
   APP_ID: string;
@@ -46,6 +46,31 @@ export async function submitInquiry(data: {
         STATUS: "Pending",
       }
     });
+
+    // 2. Dispatch immediate confirmation receipt email to the citizen
+    try {
+      const formattedDate = data.BURIAL_DATE
+        ? new Date(data.BURIAL_DATE).toLocaleDateString('en-PH', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          })
+        : null;
+
+      await sendInquiryReceivedEmail({
+        appId: data.APP_ID,
+        recipientName: data.FAMILY_NAME.trim(),
+        recipientEmail: emailClean,
+        deceasedName: data.DECEASED,
+        requestType: data.reason,
+        requestedPlot: data.REQUESTED_PLOT,
+        burialDate: formattedDate,
+        burialTime: data.TIME,
+        remarks: data.notes,
+      });
+    } catch (emailErr) {
+      console.warn('Initial receipt email dispatch warning:', emailErr);
+    }
     
     // Revalidate admin inquiries path
     revalidatePath('/admin/inquiries');

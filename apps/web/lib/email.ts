@@ -27,13 +27,13 @@ function createTransporter() {
     return null;
   }
 
-  // Gmail SMTP specific configuration or generic SMTP
+  // Gmail SMTP configuration
   if (host.includes('gmail.com') || !process.env.EMAIL_HOST) {
     return nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user,
-        pass,
+        user: user.trim(),
+        pass: pass.replace(/\s+/g, ''), // strip any accidental spaces from 16-char app passwords
       },
     });
   }
@@ -43,10 +43,130 @@ function createTransporter() {
     port,
     secure,
     auth: {
-      user,
-      pass,
+      user: user.trim(),
+      pass: pass.trim(),
     },
   });
+}
+
+/**
+ * Sends an immediate submission receipt email when the user files an inquiry.
+ */
+export async function sendInquiryReceivedEmail(
+  data: InquiryEmailData
+): Promise<{ success: boolean; messageId?: string; error?: string; unconfigured?: boolean }> {
+  try {
+    const {
+      appId,
+      recipientName,
+      recipientEmail,
+      deceasedName,
+      requestType,
+      requestedPlot,
+      burialDate,
+      burialTime,
+    } = data;
+
+    if (!recipientEmail || !recipientEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim())) {
+      return { success: false, error: 'Invalid recipient email address' };
+    }
+
+    const transporter = createTransporter();
+    if (!transporter) {
+      return {
+        success: false,
+        unconfigured: true,
+        error: 'Email service credentials (EMAIL_USER and EMAIL_APP_PASSWORD) not configured.',
+      };
+    }
+
+    const senderEmail = process.env.EMAIL_USER;
+    const fromHeader = process.env.EMAIL_FROM || `"Municipality of Jasaan Cemetery Management System" <${senderEmail}>`;
+
+    const formattedDeceased = deceasedName?.trim() || 'N/A';
+    const formattedPlot = requestedPlot?.trim() || 'N/A';
+    const formattedDate = burialDate?.trim() || 'N/A';
+    const formattedTime = burialTime?.trim() || 'N/A';
+    const formattedReason = requestType?.trim() || 'General Inquiry / Service';
+
+    const textContent = `Dear ${recipientName},
+
+Thank you for submitting your inquiry to the Municipality of Jasaan Cemetery Management System. We have received your request and it is currently pending review by our administration.
+
+Inquiry Reference Details:
+• Reference ID: ${appId}
+• Name: ${recipientName}
+• Deceased: ${formattedDeceased}
+• Request Type: ${formattedReason}
+• Requested Plot: ${formattedPlot}
+• Preferred Date: ${formattedDate}
+• Preferred Time: ${formattedTime}
+• Status: PENDING REVIEW
+
+You will receive an official acceptance email once the cemetery office reviews and approves your inquiry.
+
+Thank you,
+Municipality of Jasaan Cemetery Management System
+`;
+
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Inquiry Received</title></head>
+<body style="margin: 0; padding: 0; background-color: #12100e; font-family: 'Segoe UI', Roboto, sans-serif; color: #e8e0d0; line-height: 1.6;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #12100e; padding: 30px 10px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width: 600px; background-color: #1c1916; border: 1px solid #c8a84b; border-radius: 12px; overflow: hidden;" cellspacing="0" cellpadding="0" border="0">
+          <tr>
+            <td style="background: linear-gradient(135deg, #2a241c 0%, #171410 100%); padding: 28px 24px; text-align: center; border-bottom: 2px solid #c8a84b;">
+              <div style="font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: #c8a84b; margin-bottom: 6px;">MUNICIPALITY OF JASAAN · CEMETERY OFFICE</div>
+              <h1 style="margin: 0; color: #f5eedc; font-size: 20px;">Inquiry Received &amp; Under Review</h1>
+              <div style="margin-top: 10px; display: inline-block; background-color: rgba(200, 168, 75, 0.15); border: 1px solid rgba(200, 168, 75, 0.4); color: #e2c97e; padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+                REFERENCE ID: ${appId}
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 28px 24px;">
+              <p style="margin: 0 0 16px 0; font-size: 15px; color: #f5eedc;">Dear <strong>${recipientName}</strong>,</p>
+              <p style="margin: 0 0 20px 0; font-size: 14px; color: #d0c8b8;">We have received your cemetery inquiry. Our administrative office is currently reviewing your schedule and details.</p>
+              
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="6" border="0" style="background-color: #24201a; border: 1px solid rgba(200, 168, 75, 0.25); border-radius: 8px; font-size: 13px; margin-bottom: 20px;">
+                <tr><td width="40%" style="color: #9c9588;">Reference No:</td><td style="color: #c8a84b; font-weight: bold; font-family: monospace;">${appId}</td></tr>
+                <tr><td style="color: #9c9588;">Applicant:</td><td style="color: #f5eedc;">${recipientName}</td></tr>
+                <tr><td style="color: #9c9588;">Deceased:</td><td style="color: #f5eedc;">${formattedDeceased}</td></tr>
+                <tr><td style="color: #9c9588;">Request Type:</td><td style="color: #f5eedc;">${formattedReason}</td></tr>
+                <tr><td style="color: #9c9588;">Requested Plot:</td><td style="color: #f5eedc;">${formattedPlot}</td></tr>
+                <tr><td style="color: #9c9588;">Schedule:</td><td style="color: #f5eedc;">${formattedDate} at ${formattedTime}</td></tr>
+                <tr><td style="color: #9c9588;">Status:</td><td><span style="background-color: rgba(200, 132, 58, 0.2); color: #e6b064; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">PENDING REVIEW</span></td></tr>
+              </table>
+
+              <p style="margin: 0 0 16px 0; font-size: 13px; color: #b8b0a0;">You will receive an official approval email once our cemetery administrator accepts your booking.</p>
+              <p style="margin: 0; font-size: 13px; color: #d0c8b8;">Thank you,<br><strong style="color: #c8a84b;">Municipality of Jasaan Cemetery Management System</strong></p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+
+    const info = await transporter.sendMail({
+      from: fromHeader,
+      to: recipientEmail.trim(),
+      subject: `Inquiry Received - ${appId} | Municipality of Jasaan Cemetery Office`,
+      text: textContent,
+      html: htmlContent,
+    });
+
+    return { success: true, messageId: info.messageId };
+  } catch (error: any) {
+    console.error('[Email Service Error - Inquiry Received]', error);
+    return { success: false, error: error?.message || 'Failed to send inquiry received email' };
+  }
 }
 
 /**
@@ -253,7 +373,7 @@ cemetery@jasaan.gov.ph
       messageId: info.messageId,
     };
   } catch (error: any) {
-    console.error('[Email Service Error]', error);
+    console.error('[Email Service Error - Inquiry Acceptance]', error);
     return {
       success: false,
       error: error?.message || 'Failed to send acceptance email through SMTP.',
