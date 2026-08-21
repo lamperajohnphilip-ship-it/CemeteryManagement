@@ -449,16 +449,16 @@ export default function PaymentsPage() {
                 <tr><td colSpan={12} style={{ textAlign: 'center', padding: '30px' }}>No payment records found.</td></tr>
               ) : pageItems.map(p => (
                 <tr key={p.id}>
-                  <td>{p.ref}</td>
+                  <td><span className={styles.refBadge}>{p.ref}</span></td>
                   <td><strong>{p.payorName}</strong></td>
                   <td>{p.deceasedName}</td>
                   <td>{p.yearCovered}</td>
                   <td>{p.datePaid || '—'}</td>
-                  <td>{p.orNo || '—'}</td>
+                  <td><span style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{p.orNo || '—'}</span></td>
                   <td>{p.method || '—'}</td>
                   <td>{p.dueDate || '—'}</td>
-                  <td style={{ color: p.amountPaid >= p.amountDue ? '#a5d6a7' : '#ffb74d' }}>₱{p.amountPaid}</td>
-                  <td>₱{Math.max(0, p.amountDue - p.amountPaid)}</td>
+                  <td style={{ color: p.amountPaid >= p.amountDue ? '#a5d6a7' : '#ffb74d', fontWeight: '600' }}>₱{p.amountPaid.toLocaleString()}</td>
+                  <td style={{ fontWeight: '600' }}>₱{Math.max(0, p.amountDue - p.amountPaid).toLocaleString()}</td>
                   <td>{getStatusBadge(p.status)}</td>
                   <td>
                     <div className={styles.actionGroup}>

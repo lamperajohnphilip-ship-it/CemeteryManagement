@@ -279,7 +279,7 @@
 /* ===== TABLE ===== */
 .tblWrapper {
   overflow-x: auto;
-  max-height: 520px;
+  max-height: 580px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -287,15 +287,16 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 1320px;
+  min-width: 1380px;
+  table-layout: fixed;
 }
 
 .table th {
-  padding: 13px 14px;
+  padding: 12px 12px;
   text-align: left;
-  font-size: 0.66rem;
+  font-size: 0.65rem;
   font-weight: 600;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #C8A84B;
   border-bottom: 1px solid rgba(200, 168, 75, 0.25);
@@ -307,6 +308,20 @@
   cursor: pointer;
   user-select: none;
 }
+
+/* Specific Column Widths */
+.table th:nth-child(1) { width: 95px; }   /* REF. NO. */
+.table th:nth-child(2) { width: 150px; }  /* PAYOR'S NAME */
+.table th:nth-child(3) { width: 150px; }  /* DECEASED */
+.table th:nth-child(4) { width: 70px; }   /* YEAR */
+.table th:nth-child(5) { width: 100px; }  /* DATE PAID */
+.table th:nth-child(6) { width: 95px; }   /* OR NO. */
+.table th:nth-child(7) { width: 95px; }   /* METHOD */
+.table th:nth-child(8) { width: 100px; }  /* DUE DATE */
+.table th:nth-child(9) { width: 90px; }   /* PAID */
+.table th:nth-child(10) { width: 90px; }  /* BALANCE */
+.table th:nth-child(11) { width: 95px; }  /* STATUS */
+.table th:nth-child(12) { width: 185px; } /* ACTIONS */
 
 .table th:hover {
   color: #E2C97E;
@@ -323,11 +338,34 @@
 }
 
 .table td {
-  padding: 13px 14px;
-  font-size: 0.83rem;
+  padding: 12px 12px;
+  font-size: 0.82rem;
   border-bottom: 1px solid var(--admin-border-subtle);
   color: var(--admin-text-main);
   vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Payor and Deceased names can wrap gracefully */
+.table td:nth-child(2),
+.table td:nth-child(3) {
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.35;
+}
+
+.refBadge {
+  font-family: monospace;
+  background: var(--admin-input-bg);
+  padding: 3px 6px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  color: #E2C97E;
+  border: 1px solid rgba(200, 168, 75, 0.25);
+  display: inline-block;
+  white-space: nowrap;
 }
 
 .table tbody tr {
