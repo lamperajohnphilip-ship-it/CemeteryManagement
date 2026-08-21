@@ -13,6 +13,19 @@ export interface InquiryEmailData {
 }
 
 /**
+ * Escapes HTML characters in user input to prevent email injection & XSS attacks.
+ */
+function escapeHtml(str: string | null | undefined): string {
+  if (!str) return 'N/A';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/**
  * Creates and returns a Nodemailer transporter configured via environment variables.
  * Supports Gmail SMTP (App Password) as well as custom SMTP servers.
  */
@@ -83,6 +96,14 @@ export async function sendInquiryReceivedEmail(
     const senderEmail = process.env.EMAIL_USER;
     const fromHeader = process.env.EMAIL_FROM || `"Municipality of Jasaan Cemetery Management System" <${senderEmail}>`;
 
+    const safeAppId = escapeHtml(appId);
+    const safeName = escapeHtml(recipientName);
+    const safeDeceased = escapeHtml(deceasedName);
+    const safePlot = escapeHtml(requestedPlot);
+    const safeDate = escapeHtml(burialDate);
+    const safeTime = escapeHtml(burialTime);
+    const safeReason = escapeHtml(requestType);
+
     const formattedDeceased = deceasedName?.trim() || 'N/A';
     const formattedPlot = requestedPlot?.trim() || 'N/A';
     const formattedDate = burialDate?.trim() || 'N/A';
@@ -123,22 +144,22 @@ Municipality of Jasaan Cemetery Management System
               <div style="font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: #c8a84b; margin-bottom: 6px;">MUNICIPALITY OF JASAAN · CEMETERY OFFICE</div>
               <h1 style="margin: 0; color: #f5eedc; font-size: 20px;">Inquiry Received &amp; Under Review</h1>
               <div style="margin-top: 10px; display: inline-block; background-color: rgba(200, 168, 75, 0.15); border: 1px solid rgba(200, 168, 75, 0.4); color: #e2c97e; padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;">
-                REFERENCE ID: ${appId}
+                REFERENCE ID: ${safeAppId}
               </div>
             </td>
           </tr>
           <tr>
             <td style="padding: 28px 24px;">
-              <p style="margin: 0 0 16px 0; font-size: 15px; color: #f5eedc;">Dear <strong>${recipientName}</strong>,</p>
+              <p style="margin: 0 0 16px 0; font-size: 15px; color: #f5eedc;">Dear <strong>${safeName}</strong>,</p>
               <p style="margin: 0 0 20px 0; font-size: 14px; color: #d0c8b8;">We have received your cemetery inquiry. Our administrative office is currently reviewing your schedule and details.</p>
               
               <table role="presentation" width="100%" cellspacing="0" cellpadding="6" border="0" style="background-color: #24201a; border: 1px solid rgba(200, 168, 75, 0.25); border-radius: 8px; font-size: 13px; margin-bottom: 20px;">
-                <tr><td width="40%" style="color: #9c9588;">Reference No:</td><td style="color: #c8a84b; font-weight: bold; font-family: monospace;">${appId}</td></tr>
-                <tr><td style="color: #9c9588;">Applicant:</td><td style="color: #f5eedc;">${recipientName}</td></tr>
-                <tr><td style="color: #9c9588;">Deceased:</td><td style="color: #f5eedc;">${formattedDeceased}</td></tr>
-                <tr><td style="color: #9c9588;">Request Type:</td><td style="color: #f5eedc;">${formattedReason}</td></tr>
-                <tr><td style="color: #9c9588;">Requested Plot:</td><td style="color: #f5eedc;">${formattedPlot}</td></tr>
-                <tr><td style="color: #9c9588;">Schedule:</td><td style="color: #f5eedc;">${formattedDate} at ${formattedTime}</td></tr>
+                <tr><td width="40%" style="color: #9c9588;">Reference No:</td><td style="color: #c8a84b; font-weight: bold; font-family: monospace;">${safeAppId}</td></tr>
+                <tr><td style="color: #9c9588;">Applicant:</td><td style="color: #f5eedc;">${safeName}</td></tr>
+                <tr><td style="color: #9c9588;">Deceased:</td><td style="color: #f5eedc;">${safeDeceased}</td></tr>
+                <tr><td style="color: #9c9588;">Request Type:</td><td style="color: #f5eedc;">${safeReason}</td></tr>
+                <tr><td style="color: #9c9588;">Requested Plot:</td><td style="color: #f5eedc;">${safePlot}</td></tr>
+                <tr><td style="color: #9c9588;">Schedule:</td><td style="color: #f5eedc;">${safeDate} at ${safeTime}</td></tr>
                 <tr><td style="color: #9c9588;">Status:</td><td><span style="background-color: rgba(200, 132, 58, 0.2); color: #e6b064; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">PENDING REVIEW</span></td></tr>
               </table>
 
@@ -212,6 +233,14 @@ export async function sendInquiryAcceptanceEmail(
     const fromHeader =
       process.env.EMAIL_FROM || `"Municipality of Jasaan Cemetery Management System" <${senderEmail}>`;
 
+    const safeAppId = escapeHtml(appId);
+    const safeName = escapeHtml(recipientName);
+    const safeDeceased = escapeHtml(deceasedName);
+    const safePlot = escapeHtml(requestedPlot);
+    const safeDate = escapeHtml(burialDate);
+    const safeTime = escapeHtml(burialTime);
+    const safeReason = escapeHtml(requestType);
+
     const formattedDeceased = deceasedName?.trim() || 'N/A';
     const formattedPlot = requestedPlot?.trim() || 'N/A';
     const formattedDate = burialDate?.trim() || 'N/A';
@@ -266,7 +295,7 @@ cemetery@jasaan.gov.ph
                 Cemetery Inquiry Successfully Accepted
               </h1>
               <div style="margin-top: 10px; display: inline-block; background-color: rgba(200, 168, 75, 0.15); border: 1px solid rgba(200, 168, 75, 0.4); color: #e2c97e; padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; letter-spacing: 1px;">
-                INQUIRY REF: ${appId}
+                INQUIRY REF: ${safeAppId}
               </div>
             </td>
           </tr>
@@ -275,7 +304,7 @@ cemetery@jasaan.gov.ph
           <tr>
             <td style="padding: 32px 28px;">
               <p style="margin: 0 0 16px 0; font-size: 16px; color: #f5eedc;">
-                Dear <strong>${recipientName}</strong>,
+                Dear <strong>${safeName}</strong>,
               </p>
               <p style="margin: 0 0 24px 0; font-size: 14px; color: #d0c8b8; line-height: 1.7;">
                 We are pleased to inform you that your inquiry submitted to the <strong>Municipality of Jasaan Cemetery Management System</strong> has been successfully accepted by the administration.
@@ -295,31 +324,31 @@ cemetery@jasaan.gov.ph
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="6" border="0" style="font-size: 13px;">
                       <tr>
                         <td width="38%" style="color: #9c9588; font-weight: 500;">Inquiry ID:</td>
-                        <td style="color: #c8a84b; font-weight: 700; font-family: monospace;">${appId}</td>
+                        <td style="color: #c8a84b; font-weight: 700; font-family: monospace;">${safeAppId}</td>
                       </tr>
                       <tr>
                         <td style="color: #9c9588; font-weight: 500;">Name:</td>
-                        <td style="color: #f5eedc; font-weight: 600;">${recipientName}</td>
+                        <td style="color: #f5eedc; font-weight: 600;">${safeName}</td>
                       </tr>
                       <tr>
                         <td style="color: #9c9588; font-weight: 500;">Deceased:</td>
-                        <td style="color: #f5eedc;">${formattedDeceased}</td>
+                        <td style="color: #f5eedc;">${safeDeceased}</td>
                       </tr>
                       <tr>
                         <td style="color: #9c9588; font-weight: 500;">Request Type:</td>
-                        <td style="color: #f5eedc;">${formattedReason}</td>
+                        <td style="color: #f5eedc;">${safeReason}</td>
                       </tr>
                       <tr>
                         <td style="color: #9c9588; font-weight: 500;">Requested Plot:</td>
-                        <td style="color: #f5eedc;">${formattedPlot}</td>
+                        <td style="color: #f5eedc;">${safePlot}</td>
                       </tr>
                       <tr>
                         <td style="color: #9c9588; font-weight: 500;">Burial Date:</td>
-                        <td style="color: #f5eedc;">${formattedDate}</td>
+                        <td style="color: #f5eedc;">${safeDate}</td>
                       </tr>
                       <tr>
                         <td style="color: #9c9588; font-weight: 500;">Burial Time:</td>
-                        <td style="color: #f5eedc;">${formattedTime}</td>
+                        <td style="color: #f5eedc;">${safeTime}</td>
                       </tr>
                       <tr>
                         <td style="color: #9c9588; font-weight: 500;">Status:</td>
