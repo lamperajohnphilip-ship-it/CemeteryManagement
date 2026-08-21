@@ -33,21 +33,22 @@ export default function Cemetery2DMap({
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapWidth = 1200;
-  const mapHeight = 900;
+  const mapWidth = 1700;
+  const mapHeight = 1150;
 
-  // Plot coordinates calculation
+  // Plot coordinates calculation (Cadastral Block layout with walking strips)
   const getPlotCoordinates = useCallback((plot: GravePlotWithDeceased) => {
     const { section, row, column } = plot;
 
+    const plotW = 66;
+    const plotH = 48;
+    const gapX = 6;
+    const gapY = 6;
+
     if (section === 'A') {
-      // West Lawn: 10 cols x 8 rows
-      const startX = 85;
-      const startY = 490;
-      const plotW = 36;
-      const plotH = 30;
-      const gapX = 6;
-      const gapY = 8;
+      // West Lawn Cadastral Block (10 cols x 8 rows) -> A-1 to A-80
+      const startX = 110;
+      const startY = 160;
       return {
         x: startX + (column - 1) * (plotW + gapX),
         y: startY + (row - 1) * (plotH + gapY),
@@ -55,13 +56,9 @@ export default function Cemetery2DMap({
         h: plotH
       };
     } else if (section === 'B') {
-      // East Lawn: 10 cols x 8 rows
-      const startX = 695;
-      const startY = 490;
-      const plotW = 36;
-      const plotH = 30;
-      const gapX = 6;
-      const gapY = 8;
+      // East Lawn Cadastral Block (10 cols x 8 rows) -> B-1 to B-80
+      const startX = 890;
+      const startY = 160;
       return {
         x: startX + (column - 1) * (plotW + gapX),
         y: startY + (row - 1) * (plotH + gapY),
@@ -69,13 +66,9 @@ export default function Cemetery2DMap({
         h: plotH
       };
     } else {
-      // Section C: North Garden (11 cols x 8 rows)
-      const startX = 175;
-      const startY = 120;
-      const plotW = 36;
-      const plotH = 28;
-      const gapX = 6;
-      const gapY = 6;
+      // Section C: North Garden Cadastral Block (11 cols x 8 rows) -> C-1 to C-87
+      const startX = 430;
+      const startY = 660;
       return {
         x: startX + (column - 1) * (plotW + gapX),
         y: startY + (row - 1) * (plotH + gapY),
@@ -121,7 +114,7 @@ export default function Cemetery2DMap({
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
-    const newScale = Math.min(Math.max(scale * zoomFactor, 0.5), 3.5);
+    const newScale = Math.min(Math.max(scale * zoomFactor, 0.4), 3.5);
 
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
@@ -138,7 +131,7 @@ export default function Cemetery2DMap({
 
   // Drag & Pan handlers
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return; // Only left click
+    if (e.button !== 0) return; // Left click only
     setIsDragging(true);
     setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
   };
@@ -164,7 +157,7 @@ export default function Cemetery2DMap({
     setIsDragging(false);
   };
 
-  // Quick jump views
+  // Reset View
   const resetView = () => {
     if (!containerRef.current) return;
     const containerW = containerRef.current.clientWidth;
@@ -182,26 +175,22 @@ export default function Cemetery2DMap({
     const containerW = containerRef.current.clientWidth;
     const containerH = containerRef.current.clientHeight;
 
-    let targetX = 600;
-    let targetY = 450;
-    let targetScale = 1.3;
+    let targetX = 850;
+    let targetY = 575;
+    let targetScale = 1.1;
 
     if (section === 'A') {
-      targetX = 290;
-      targetY = 640;
-      targetScale = 1.5;
+      targetX = 460;
+      targetY = 360;
+      targetScale = 1.35;
     } else if (section === 'B') {
-      targetX = 900;
-      targetY = 640;
-      targetScale = 1.5;
+      targetX = 1240;
+      targetY = 360;
+      targetScale = 1.35;
     } else if (section === 'C') {
-      targetX = 600;
-      targetY = 260;
-      targetScale = 1.4;
-    } else if (section === 'gate') {
-      targetX = 600;
-      targetY = 820;
-      targetScale = 1.6;
+      targetX = 850;
+      targetY = 880;
+      targetScale = 1.35;
     }
 
     setScale(targetScale);
@@ -228,87 +217,165 @@ export default function Cemetery2DMap({
     return false;
   };
 
-  // Status color helpers
+  // Name formatter helper (Surname, Given Name)
+  const formatDeceasedName = (fullName: string) => {
+    if (!fullName) return { lastName: '', firstNames: '' };
+    const parts = fullName.trim().split(/\s+/);
+    if (parts.length === 1) return { lastName: parts[0], firstNames: '' };
+    if (parts.length === 2) return { lastName: parts[1], firstNames: parts[0] };
+    const lastName = parts[parts.length - 1];
+    const firstNames = parts.slice(0, parts.length - 1).join(' ');
+    return { lastName, firstNames };
+  };
+
+  // Status Styling
   const getPlotStyles = (plot: GravePlotWithDeceased) => {
     const isSelected = selectedPlotNumber && plot.plotNumber.toLowerCase() === selectedPlotNumber.toLowerCase();
     const isHighlighted = highlightPlotNumber && plot.plotNumber.toLowerCase() === highlightPlotNumber.toLowerCase();
     const filteredOut = isPlotFiltered(plot);
 
-    let fill = '#2e7d32'; // Available (green)
-    let stroke = '#4caf50';
-    let textColor = '#e8f5e9';
+    let fill = '#c8e6c9'; // Available (light green)
+    let stroke = '#2e7d32'; // Green border
+    let textColor = '#1b5e20';
 
     if (plot.status === 'Occupied') {
-      fill = '#8b0000'; // Occupied (dark red)
-      stroke = '#e53935';
-      textColor = '#ffebee';
+      fill = '#cfd8dc'; // Occupied with Burial (light slate)
+      stroke = '#455a64'; // Dark slate border
+      textColor = '#0f172a';
     } else if (plot.status === 'Reserved') {
-      fill = '#b26a00'; // Reserved (amber)
-      stroke = '#fb8c00';
-      textColor = '#fff8e1';
-    } else if (plot.status === 'Maintenance') {
-      fill = '#0277bd'; // Maintenance (blue)
-      stroke = '#29b6f6';
-      textColor = '#e1f5fe';
+      fill = '#f8bbd0'; // Reserved (pink)
+      stroke = '#c2185b'; // Magenta border
+      textColor = '#880e4f';
+    } else if (plot.status === 'Maintenance' || plot.status === 'Restricted') {
+      fill = '#ffccbc'; // Restricted / Maintenance (coral)
+      stroke = '#d84315';
+      textColor = '#bf360c';
+    } else if (plot.status === 'Sold') {
+      fill = '#b2ebf2'; // Sold available (cyan)
+      stroke = '#00838f';
+      textColor = '#006064';
     } else if (plot.status === 'Unavailable') {
-      fill = '#263238'; // Unavailable (slate)
-      stroke = '#546e7a';
-      textColor = '#eceff1';
-    }
-
-    if (isSelected || isHighlighted) {
-      stroke = '#FFD700';
+      fill = '#e2e8f0';
+      stroke = '#94a3b8';
+      textColor = '#64748b';
     }
 
     return {
-      fill: filteredOut ? '#1a1f1c' : fill,
+      fill: filteredOut ? '#2b382d' : fill,
       stroke: isSelected ? '#FFD700' : isHighlighted ? '#ff9800' : stroke,
-      strokeWidth: isSelected || isHighlighted ? 2.5 : 1,
-      textColor: filteredOut ? '#555555' : textColor,
+      strokeWidth: isSelected || isHighlighted ? 3 : 1.2,
+      textColor: filteredOut ? '#666666' : textColor,
       opacity: filteredOut ? 0.35 : 1
     };
   };
 
+  // Calculate minimap red viewport box coordinates
+  const getMinimapViewportRect = () => {
+    if (!containerRef.current) return { x: 0, y: 0, w: 50, h: 40 };
+    const containerW = containerRef.current.clientWidth || 1000;
+    const containerH = containerRef.current.clientHeight || 650;
+
+    const visibleLeft = (-pan.x) / scale;
+    const visibleTop = (-pan.y) / scale;
+    const visibleW = containerW / scale;
+    const visibleH = containerH / scale;
+
+    const miniScaleX = 170 / mapWidth;
+    const miniScaleY = 150 / mapHeight;
+
+    const x = Math.max(0, Math.min(170, visibleLeft * miniScaleX));
+    const y = Math.max(0, Math.min(150, visibleTop * miniScaleY));
+    const w = Math.max(16, Math.min(170, visibleW * miniScaleX));
+    const h = Math.max(14, Math.min(150, visibleH * miniScaleY));
+
+    return { x, y, w, h };
+  };
+
+  const miniRect = getMinimapViewportRect();
+
   return (
     <div className={styles.mapContainer} ref={containerRef}>
-      {/* Top Legend */}
-      <div className={styles.mapLegend}>
-        <div className={styles.legendItem}>
-          <span className={`${styles.legendColor} ${styles.colorAvailable}`}></span>
-          <span>Available ({plots.filter(p => p.status === 'Available').length})</span>
-        </div>
-        <div className={styles.legendItem}>
-          <span className={`${styles.legendColor} ${styles.colorOccupied}`}></span>
-          <span>Occupied ({plots.filter(p => p.status === 'Occupied').length})</span>
-        </div>
-        <div className={styles.legendItem}>
-          <span className={`${styles.legendColor} ${styles.colorReserved}`}></span>
-          <span>Reserved ({plots.filter(p => p.status === 'Reserved').length})</span>
-        </div>
-        <div className={styles.legendItem}>
-          <span className={`${styles.legendColor} ${styles.colorMaintenance}`}></span>
-          <span>Maintenance ({plots.filter(p => p.status === 'Maintenance').length})</span>
-        </div>
-      </div>
-
-      {/* Map Controls */}
+      {/* Top Left Navigation Controls */}
       <div className={styles.mapControls}>
         <button className={styles.controlBtn} onClick={() => setScale(s => Math.min(s * 1.25, 3.5))} title="Zoom In">+</button>
-        <button className={styles.controlBtn} onClick={() => setScale(s => Math.max(s * 0.8, 0.5))} title="Zoom Out">−</button>
-        <button className={styles.controlBtn} onClick={resetView} title="Fit to Screen" style={{ fontSize: '0.85rem' }}>⛶</button>
+        <button className={styles.controlBtn} onClick={() => setScale(s => Math.max(s * 0.8, 0.4))} title="Zoom Out">−</button>
+        <button className={styles.controlBtn} onClick={resetView} title="Fit Entire Cemetery" style={{ fontSize: '0.9rem' }}>⛶</button>
       </div>
 
-      {/* Section Quick Jump Buttons */}
+      {/* Section Quick Jump Chips */}
       <div className={styles.sectionJumps}>
-        <span style={{ fontSize: '0.7rem', color: '#78716c', alignSelf: 'center', paddingLeft: '4px' }}>JUMP TO:</span>
         <button className={styles.jumpBtn} onClick={resetView}>Full Cemetery</button>
-        <button className={styles.jumpBtn} onClick={() => jumpToSection('A')}>Section A (West)</button>
-        <button className={styles.jumpBtn} onClick={() => jumpToSection('B')}>Section B (East)</button>
-        <button className={styles.jumpBtn} onClick={() => jumpToSection('C')}>Section C (North)</button>
-        <button className={styles.jumpBtn} onClick={() => jumpToSection('gate')}>Main Gate</button>
+        <button className={styles.jumpBtn} onClick={() => jumpToSection('A')}>Section A · West</button>
+        <button className={styles.jumpBtn} onClick={() => jumpToSection('B')}>Section B · East</button>
+        <button className={styles.jumpBtn} onClick={() => jumpToSection('C')}>Section C · North</button>
       </div>
 
-      {/* Viewport for SVG Rendering */}
+      {/* Top Right Minimap Overview Inset */}
+      <div className={styles.minimapContainer} onClick={resetView} title="Cemetery Overview - Click to reset view">
+        <div className={styles.minimapHeader}>Overview</div>
+        <svg viewBox={`0 0 ${mapWidth} ${mapHeight}`} className={styles.minimapSvg}>
+          {/* Minimap Background Ground */}
+          <rect x="0" y="0" width={mapWidth} height={mapHeight} fill="#3b5d2e" />
+
+          {/* Section Footprint Outlines */}
+          {/* Section A */}
+          <rect x="110" y="160" width="714" height="426" fill="#e2e8f0" stroke="#1e293b" strokeWidth="4" rx="6" />
+          <text x="467" y="385" fill="#334155" fontSize="64" fontWeight="bold" textAnchor="middle">A</text>
+
+          {/* Section B */}
+          <rect x="890" y="160" width="714" height="426" fill="#e2e8f0" stroke="#1e293b" strokeWidth="4" rx="6" />
+          <text x="1247" y="385" fill="#334155" fontSize="64" fontWeight="bold" textAnchor="middle">B</text>
+
+          {/* Section C */}
+          <rect x="430" y="660" width="786" height="426" fill="#e2e8f0" stroke="#1e293b" strokeWidth="4" rx="6" />
+          <text x="823" y="885" fill="#334155" fontSize="64" fontWeight="bold" textAnchor="middle">C</text>
+
+          {/* Red Active Viewport Rectangle */}
+          <rect
+            x={(-pan.x) / scale}
+            y={(-pan.y) / scale}
+            width={((containerRef.current?.clientWidth || 1000) / scale)}
+            height={((containerRef.current?.clientHeight || 650) / scale)}
+            fill="rgba(239, 68, 68, 0.2)"
+            stroke="#dc2626"
+            strokeWidth="12"
+            rx="8"
+          />
+        </svg>
+      </div>
+
+      {/* Bottom Right GIS Legend Card */}
+      <div className={styles.mapLegendCard}>
+        <div className={styles.legendCardTitle}>Legend</div>
+        <div className={styles.legendList}>
+          <div className={styles.legendRow}>
+            <span className={`${styles.legendSwatch} ${styles.swatchAvailable}`} />
+            <span>Available</span>
+          </div>
+          <div className={styles.legendRow}>
+            <span className={`${styles.legendSwatch} ${styles.swatchReserved}`} />
+            <span>Reserved</span>
+          </div>
+          <div className={styles.legendRow}>
+            <span className={`${styles.legendSwatch} ${styles.swatchRestricted}`} />
+            <span>Restricted</span>
+          </div>
+          <div className={styles.legendRow}>
+            <span className={`${styles.legendSwatch} ${styles.swatchSold}`} />
+            <span>Sold</span>
+          </div>
+          <div className={styles.legendRow}>
+            <span className={`${styles.legendSwatch} ${styles.swatchOccupied}`} />
+            <span>Sold With Burial</span>
+          </div>
+          <div className={styles.legendRow}>
+            <span className={`${styles.legendSwatch} ${styles.swatchBurials}`} />
+            <span>Burials / Vault</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Viewport for Interactive SVG Canvas */}
       <div
         className={styles.mapViewport}
         onWheel={handleWheel}
@@ -327,120 +394,105 @@ export default function Cemetery2DMap({
           viewBox={`0 0 ${mapWidth} ${mapHeight}`}
         >
           <defs>
-            {/* Lawn background pattern */}
-            <linearGradient id="lawnGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#142416" />
-              <stop offset="100%" stopColor="#0b170e" />
+            {/* Real Grass Turf Background Pattern */}
+            <linearGradient id="gisGrassGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#4f7e38" />
+              <stop offset="50%" stopColor="#416b2d" />
+              <stop offset="100%" stopColor="#4c7736" />
             </linearGradient>
 
-            {/* Pathway stone gradient */}
-            <linearGradient id="pathGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#2c2720" />
-              <stop offset="50%" stopColor="#3d372e" />
-              <stop offset="100%" stopColor="#2c2720" />
+            {/* Mown grass pattern */}
+            <pattern id="mownGrass" width="80" height="80" patternUnits="userSpaceOnUse">
+              <rect width="80" height="80" fill="#436d2f" />
+              <line x1="0" y1="0" x2="80" y2="80" stroke="#3b6129" strokeWidth="8" opacity="0.45" />
+              <line x1="80" y1="0" x2="0" y2="80" stroke="#4c7736" strokeWidth="4" opacity="0.3" />
+            </pattern>
+
+            {/* Walking pathway corridor pattern */}
+            <linearGradient id="walkwayGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#679e4d" />
+              <stop offset="50%" stopColor="#76ae5b" />
+              <stop offset="100%" stopColor="#679e4d" />
             </linearGradient>
 
-            {/* Plaza stone pattern */}
-            <radialGradient id="plazaGradient" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#4a4235" />
-              <stop offset="85%" stopColor="#2d2820" />
-              <stop offset="100%" stopColor="#1c1914" />
-            </radialGradient>
+            {/* Drop shadow for grave plots */}
+            <filter id="plotShadow" x="-5%" y="-5%" width="115%" height="115%">
+              <feDropShadow dx="1" dy="1.5" stdDeviation="1.5" floodColor="#000000" floodOpacity="0.25" />
+            </filter>
           </defs>
 
-          {/* 1. Base Ground Lawn */}
-          <rect x="0" y="0" width={mapWidth} height={mapHeight} fill="url(#lawnGradient)" />
+          {/* 1. Base Turf Layer */}
+          <rect x="0" y="0" width={mapWidth} height={mapHeight} fill="url(#gisGrassGrad)" />
+          <rect x="0" y="0" width={mapWidth} height={mapHeight} fill="url(#mownGrass)" opacity="0.75" />
 
-          {/* 2. Perimeter Stone Wall with Decorative Border */}
-          <rect x="30" y="30" width={mapWidth - 60} height={mapHeight - 60} fill="none" stroke="#544c3d" strokeWidth="12" rx="16" />
-          <rect x="36" y="36" width={mapWidth - 72} height={mapHeight - 72} fill="none" stroke="#2a241b" strokeWidth="2" rx="12" />
+          {/* 2. Walking corridors & Buffer lawns separating Cadastral Blocks */}
+          {/* Vertical central corridor */}
+          <rect x="830" y="40" width="50" height={mapHeight - 80} fill="url(#walkwayGrad)" rx="6" />
+          <line x1="855" y1="50" x2="855" y2={mapHeight - 50} stroke="#2e5020" strokeWidth="1.5" strokeDasharray="6,6" opacity="0.5" />
 
-          {/* Corner Watchtowers / Bastions */}
-          {[[30, 30], [mapWidth - 30, 30], [30, mapHeight - 30], [mapWidth - 30, mapHeight - 30]].map(([cx, cy], i) => (
-            <circle key={i} cx={cx} cy={cy} r="18" fill="#3e372b" stroke="#C8A84B" strokeWidth="2" />
-          ))}
+          {/* Horizontal cross avenue */}
+          <rect x="50" y="595" width={mapWidth - 100} height="55" fill="url(#walkwayGrad)" rx="6" />
+          <line x1="60" y1="622" x2={mapWidth - 60} y2="622" stroke="#2e5020" strokeWidth="1.5" strokeDasharray="6,6" opacity="0.5" />
 
-          {/* 3. PATHWAYS & AVENUES */}
-          {/* Main Central North-South Boulevard */}
-          <rect x="530" y="42" width="140" height="780" fill="url(#pathGradient)" rx="6" />
-          <line x1="600" y1="50" x2="600" y2="820" stroke="#C8A84B" strokeWidth="1.5" strokeDasharray="8,8" opacity="0.4" />
+          {/* 3. Cadastral Survey Boundary Lines (Purple/Magenta lines from reference) */}
+          {/* Section A Survey boundary */}
+          <rect x="95" y="145" width="744" height="440" fill="none" stroke="#a21caf" strokeWidth="1.5" strokeDasharray="8,6" rx="4" />
+          {/* Section B Survey boundary */}
+          <rect x="875" y="145" width="744" height="440" fill="none" stroke="#a21caf" strokeWidth="1.5" strokeDasharray="8,6" rx="4" />
+          {/* Section C Survey boundary */}
+          <rect x="415" y="645" width="816" height="440" fill="none" stroke="#a21caf" strokeWidth="1.5" strokeDasharray="8,6" rx="4" />
 
-          {/* East-West Cross Avenue */}
-          <rect x="42" y="425" width={mapWidth - 84} height="70" fill="url(#pathGradient)" rx="6" />
-          <line x1="50" y1="460" x2={mapWidth - 50} y2="460" stroke="#C8A84B" strokeWidth="1.5" strokeDasharray="8,8" opacity="0.4" />
-
-          {/* Perimeter Walkways */}
-          <rect x="55" y="55" width={mapWidth - 110} height={mapHeight - 110} fill="none" stroke="#2d2820" strokeWidth="16" rx="10" />
-
-          {/* 4. CENTRAL MEMORIAL PLAZA / ROUNDABOUT */}
-          <circle cx="600" cy="460" r="85" fill="url(#plazaGradient)" stroke="#C8A84B" strokeWidth="3" />
-          <circle cx="600" cy="460" r="65" fill="#1b241c" stroke="#544c3d" strokeWidth="2" />
-
-          {/* Center Memorial Monument & Cross */}
-          <circle cx="600" cy="460" r="30" fill="#2d2820" stroke="#C8A84B" strokeWidth="2" />
-          {/* Cross icon */}
-          <rect x="597" y="440" width="6" height="40" fill="#E2C97E" />
-          <rect x="588" y="448" width="24" height="6" fill="#E2C97E" />
-          <text x="600" y="505" fill="#E2C97E" fontSize="9" fontWeight="bold" textAnchor="middle" letterSpacing="1">MEMORIAL PLAZA</text>
-
-          {/* 5. MAIN ENTRANCE GATE & SECURITY PAVILION */}
-          <g transform="translate(500, 810)">
-            <rect x="0" y="0" width="200" height="55" fill="#241e17" stroke="#C8A84B" strokeWidth="2.5" rx="8" />
-            <text x="100" y="24" fill="#E2C97E" fontSize="11" fontWeight="bold" textAnchor="middle" letterSpacing="1.5">MAIN ENTRANCE</text>
-            <text x="100" y="42" fill="#a8a29e" fontSize="8" textAnchor="middle">MUNICIPALITY OF JASAAN CEMETERY</text>
-            {/* Gate Bars */}
-            {[-80, -40, 0, 40, 80].map((gx, idx) => (
-              <circle key={idx} cx={100 + gx} cy="55" r="4" fill="#C8A84B" />
-            ))}
+          {/* 4. Pink/Magenta Section & Survey Badges (Exactly like 6A, 7A, 38, 21, D, E in reference image) */}
+          {/* Section A Markers */}
+          <g transform="translate(85, 150)">
+            <circle cx="0" cy="0" r="14" fill="#ec4899" stroke="#be185d" strokeWidth="1.5" />
+            <text x="0" y="4" fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle">6A</text>
+          </g>
+          <g transform="translate(845, 150)">
+            <circle cx="0" cy="0" r="14" fill="#ec4899" stroke="#be185d" strokeWidth="1.5" />
+            <text x="0" y="4" fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle">7A</text>
+          </g>
+          <g transform="translate(85, 590)">
+            <circle cx="0" cy="0" r="14" fill="#ec4899" stroke="#be185d" strokeWidth="1.5" />
+            <text x="0" y="4" fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle">3A</text>
+          </g>
+          <g transform="translate(855, 590)">
+            <circle cx="0" cy="0" r="14" fill="#ec4899" stroke="#be185d" strokeWidth="1.5" />
+            <text x="0" y="4" fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle">38</text>
+          </g>
+          <g transform="translate(410, 650)">
+            <circle cx="0" cy="0" r="14" fill="#ec4899" stroke="#be185d" strokeWidth="1.5" />
+            <text x="0" y="4" fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle">21</text>
+          </g>
+          <g transform="translate(1235, 650)">
+            <circle cx="0" cy="0" r="14" fill="#ec4899" stroke="#be185d" strokeWidth="1.5" />
+            <text x="0" y="4" fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle">20</text>
           </g>
 
-          {/* 6. SECTION BANNERS & LABELS */}
-          {/* Section A Banner */}
-          <g transform="translate(85, 465)">
-            <rect x="0" y="0" width="415" height="20" fill="rgba(18, 26, 20, 0.9)" stroke="#4caf50" strokeWidth="1" rx="4" />
-            <text x="207" y="14" fill="#81c784" fontSize="10" fontWeight="bold" textAnchor="middle" letterSpacing="1.2">
-              SECTION A · WEST LAWN (80 PLOTS)
-            </text>
+          {/* Section Banners */}
+          <g transform="translate(110, 115)">
+            <rect x="0" y="0" width="260" height="26" fill="#ffffff" stroke="#a21caf" strokeWidth="1.5" rx="4" />
+            <text x="130" y="17" fill="#86198f" fontSize="12" fontWeight="bold" textAnchor="middle">SECTION A · WEST LAWN</text>
+          </g>
+          <g transform="translate(890, 115)">
+            <rect x="0" y="0" width="260" height="26" fill="#ffffff" stroke="#a21caf" strokeWidth="1.5" rx="4" />
+            <text x="130" y="17" fill="#86198f" fontSize="12" fontWeight="bold" textAnchor="middle">SECTION B · EAST LAWN</text>
+          </g>
+          <g transform="translate(430, 615)">
+            <rect x="0" y="0" width="310" height="26" fill="#ffffff" stroke="#a21caf" strokeWidth="1.5" rx="4" />
+            <text x="155" y="17" fill="#86198f" fontSize="12" fontWeight="bold" textAnchor="middle">SECTION C · NORTH MEMORIAL GARDEN</text>
           </g>
 
-          {/* Section B Banner */}
-          <g transform="translate(695, 465)">
-            <rect x="0" y="0" width="415" height="20" fill="rgba(18, 26, 20, 0.9)" stroke="#4caf50" strokeWidth="1" rx="4" />
-            <text x="207" y="14" fill="#81c784" fontSize="10" fontWeight="bold" textAnchor="middle" letterSpacing="1.2">
-              SECTION B · EAST LAWN (80 PLOTS)
-            </text>
-          </g>
-
-          {/* Section C Banner */}
-          <g transform="translate(175, 95)">
-            <rect x="0" y="0" width="455" height="20" fill="rgba(18, 26, 20, 0.9)" stroke="#4caf50" strokeWidth="1" rx="4" />
-            <text x="227" y="14" fill="#81c784" fontSize="10" fontWeight="bold" textAnchor="middle" letterSpacing="1.2">
-              SECTION C · NORTH MEMORIAL GARDEN (87 PLOTS)
-            </text>
-          </g>
-
-          {/* 7. LANDSCAPING TREES & GARDENS */}
-          {/* Cypress Trees along boundaries */}
-          {[
-            [120, 75], [260, 75], [400, 75], [800, 75], [940, 75], [1080, 75],
-            [60, 200], [60, 360], [60, 580], [60, 740],
-            [1140, 200], [1140, 360], [1140, 580], [1140, 740],
-            [280, 850], [420, 850], [780, 850], [920, 850]
-          ].map(([tx, ty], idx) => (
-            <g key={idx} transform={`translate(${tx}, ${ty})`}>
-              <circle cx="0" cy="0" r="14" fill="#1b4d24" stroke="#0e2913" strokeWidth="2" opacity="0.85" />
-              <circle cx="-3" cy="-3" r="8" fill="#2d6e38" opacity="0.9" />
-              <circle cx="0" cy="0" r="3" fill="#0e2913" />
-            </g>
-          ))}
-
-          {/* 8. GRAVE PLOTS (CLICKABLE RECTANGLES) */}
+          {/* 5. GRAVE PLOT TILES (Cadastral Lots with Deceased Names) */}
           {plots.map(plot => {
             const coords = getPlotCoordinates(plot);
             const stylesObj = getPlotStyles(plot);
             const isHovered = hoveredPlot?.id === plot.id;
             const isSelected = selectedPlotNumber && plot.plotNumber.toLowerCase() === selectedPlotNumber.toLowerCase();
             const isHighlighted = highlightPlotNumber && plot.plotNumber.toLowerCase() === highlightPlotNumber.toLowerCase();
+
+            const deceasedName = plot.deceasedRecord?.NAME_OF_DECEASED || '';
+            const { lastName, firstNames } = formatDeceasedName(deceasedName);
 
             return (
               <g
@@ -450,21 +502,22 @@ export default function Cemetery2DMap({
                 onMouseEnter={() => setHoveredPlot(plot)}
                 onMouseLeave={() => setHoveredPlot(null)}
                 style={{ cursor: 'pointer' }}
+                filter="url(#plotShadow)"
               >
-                {/* Highlight Spotlight / Beacon */}
+                {/* Highlight Beacon Spotlight */}
                 {(isSelected || isHighlighted) && (
                   <circle
                     cx={coords.w / 2}
                     cy={coords.h / 2}
-                    r={coords.w * 0.8}
+                    r={coords.w * 0.75}
                     fill="none"
                     stroke="#FFD700"
-                    strokeWidth="3"
+                    strokeWidth="3.5"
                     className={styles.pulseCircle}
                   />
                 )}
 
-                {/* Plot Rectangle */}
+                {/* Plot Outer Lot Rectangle */}
                 <rect
                   x="0"
                   y="0"
@@ -477,45 +530,131 @@ export default function Cemetery2DMap({
                   opacity={stylesObj.opacity}
                   style={{
                     transition: 'all 0.15s ease',
-                    filter: isHovered ? 'drop-shadow(0 0 6px rgba(200, 168, 75, 0.8))' : 'none'
+                    filter: isHovered ? 'brightness(1.08) drop-shadow(0 0 6px rgba(56, 189, 248, 0.8))' : 'none'
                   }}
                 />
 
-                {/* Headstone Marker Shape */}
-                <rect
-                  x="3"
-                  y="3"
-                  width={coords.w - 6}
-                  height="5"
-                  fill="rgba(255, 255, 255, 0.2)"
-                  rx="1"
-                />
-
-                {/* Plot ID Label */}
+                {/* Plot Number in Corner/Top (like 1-1, 2-1, A-1) */}
                 <text
-                  x={coords.w / 2}
-                  y={coords.h / 2 + 3}
-                  fill={stylesObj.textColor}
-                  fontSize="7.5"
+                  x="4"
+                  y="9.5"
+                  fill="#475569"
+                  fontSize="6.5"
                   fontWeight="bold"
-                  textAnchor="middle"
-                  fontFamily="monospace"
+                  fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
                   opacity={stylesObj.opacity}
                 >
                   {plot.plotNumber}
                 </text>
 
-                {/* Status Indicator Dot/Glyph */}
+                {/* Case 1: OCCUPIED (Sold with Burial) -> Inner Vault Box + Deceased Surname & First Names */}
                 {plot.status === 'Occupied' && (
+                  <>
+                    {/* Inner Vault / Tomb Box */}
+                    <rect
+                      x="4"
+                      y="12"
+                      width={coords.w - 8}
+                      height={coords.h - 15}
+                      rx="2"
+                      fill="#b0bec5"
+                      stroke="#78909c"
+                      strokeWidth="0.8"
+                      opacity="0.65"
+                    />
+
+                    {/* Surname in bold dark text (Top line) */}
+                    <text
+                      x={coords.w / 2}
+                      y="24"
+                      fill="#0f172a"
+                      fontSize="7.5"
+                      fontWeight="bold"
+                      textAnchor="middle"
+                      fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+                    >
+                      {lastName || 'Occupied'}
+                    </text>
+
+                    {/* First name below (Bottom line) */}
+                    {firstNames && (
+                      <text
+                        x={coords.w / 2}
+                        y="34"
+                        fill="#334155"
+                        fontSize="6.5"
+                        textAnchor="middle"
+                        fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+                      >
+                        {firstNames}
+                      </text>
+                    )}
+                  </>
+                )}
+
+                {/* Case 2: AVAILABLE -> Centered Green Plot Label */}
+                {plot.status === 'Available' && (
                   <text
                     x={coords.w / 2}
-                    y={coords.h - 4}
-                    fill="#ffcdd2"
-                    fontSize="6"
+                    y={coords.h / 2 + 4}
+                    fill="#1b5e20"
+                    fontSize="8.5"
+                    fontWeight="bold"
                     textAnchor="middle"
+                    fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
                   >
-                    ✝
+                    {plot.plotNumber}
                   </text>
+                )}
+
+                {/* Case 3: RESERVED -> Pink Plot Label with Reserved text */}
+                {plot.status === 'Reserved' && (
+                  <>
+                    <text
+                      x={coords.w / 2}
+                      y="23"
+                      fill="#880e4f"
+                      fontSize="7.5"
+                      fontWeight="bold"
+                      textAnchor="middle"
+                    >
+                      {plot.plotNumber}
+                    </text>
+                    <text
+                      x={coords.w / 2}
+                      y="33"
+                      fill="#ad1457"
+                      fontSize="6.2"
+                      textAnchor="middle"
+                    >
+                      Reserved
+                    </text>
+                  </>
+                )}
+
+                {/* Case 4: RESTRICTED / MAINTENANCE */}
+                {(plot.status === 'Maintenance' || plot.status === 'Restricted') && (
+                  <>
+                    <text
+                      x={coords.w / 2}
+                      y="23"
+                      fill="#bf360c"
+                      fontSize="7.5"
+                      fontWeight="bold"
+                      textAnchor="middle"
+                    >
+                      {plot.plotNumber}
+                    </text>
+                    <text
+                      x={coords.w / 2}
+                      y="33"
+                      fill="#d84315"
+                      fontSize="6"
+                      textAnchor="middle"
+                    >
+                      Restricted
+                    </text>
+                  </>
                 )}
               </g>
             );
@@ -538,9 +677,9 @@ export default function Cemetery2DMap({
               className={styles.tooltipBadge}
               style={{
                 backgroundColor:
-                  hoveredPlot.status === 'Occupied' ? '#c62828' :
-                  hoveredPlot.status === 'Reserved' ? '#e65100' :
-                  hoveredPlot.status === 'Maintenance' ? '#0277bd' : '#2e7d32',
+                  hoveredPlot.status === 'Occupied' ? '#334155' :
+                  hoveredPlot.status === 'Reserved' ? '#ec4899' :
+                  hoveredPlot.status === 'Maintenance' ? '#ea580c' : '#16a34a',
                 color: '#ffffff'
               }}
             >
@@ -553,12 +692,12 @@ export default function Cemetery2DMap({
           {hoveredPlot.deceasedRecord ? (
             <div className={styles.tooltipDeceased}>
               <div>✝ {hoveredPlot.deceasedRecord.NAME_OF_DECEASED}</div>
-              <div style={{ fontSize: '0.7rem', color: '#a8a29e', fontWeight: 'normal' }}>
+              <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 'normal', marginTop: '2px' }}>
                 Ref: {hoveredPlot.deceasedRecord.REF_NO}
               </div>
             </div>
           ) : (
-            <div style={{ fontSize: '0.72rem', color: '#81c784', marginTop: '4px' }}>
+            <div style={{ fontSize: '0.74rem', color: '#86efac', marginTop: '4px' }}>
               ✓ Ready for assignment
             </div>
           )}

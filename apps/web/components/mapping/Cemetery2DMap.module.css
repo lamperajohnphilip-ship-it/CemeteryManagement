@@ -1,13 +1,16 @@
+﻿/* ===== CADASTRAL CEMETERY 2D MAP STYLES ===== */
+
 .mapContainer {
   position: relative;
   width: 100%;
-  height: 650px;
-  background: #0d110f;
+  height: 680px;
+  background: #2d4a22;
   border-radius: 14px;
-  border: 1px solid rgba(200, 168, 75, 0.25);
+  border: 1px solid rgba(200, 168, 75, 0.3);
   overflow: hidden;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
   user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
 .mapViewport {
@@ -28,173 +31,262 @@
   will-change: transform;
 }
 
-/* ===== CONTROL BUTTONS ===== */
+/* ===== CONTROL BUTTONS (Top Left) ===== */
 .mapControls {
   position: absolute;
   top: 16px;
-  right: 16px;
+  left: 16px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  z-index: 20;
+  z-index: 30;
 }
 
 .controlBtn {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 8px;
-  background: rgba(22, 26, 23, 0.85);
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(200, 168, 75, 0.3);
-  color: #E2C97E;
+  border: 1px solid #cbd5e1;
+  color: #1e293b;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   font-weight: bold;
-  transition: all 0.2s;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.15s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .controlBtn:hover {
-  background: rgba(200, 168, 75, 0.2);
-  border-color: #C8A84B;
-  color: #ffffff;
+  background: #ffffff;
+  border-color: #94a3b8;
+  color: #0f172a;
   transform: scale(1.05);
 }
 
-/* ===== SECTION JUMP BAR ===== */
+/* ===== SECTION JUMP CHIPS (Top Left Beside Controls) ===== */
 .sectionJumps {
   position: absolute;
-  bottom: 16px;
-  left: 16px;
+  top: 16px;
+  left: 68px;
   display: flex;
-  gap: 8px;
-  z-index: 20;
-  background: rgba(18, 22, 20, 0.85);
+  gap: 6px;
+  z-index: 30;
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(8px);
-  padding: 6px 10px;
-  border-radius: 30px;
-  border: 1px solid rgba(200, 168, 75, 0.25);
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .jumpBtn {
   background: transparent;
   border: 1px solid transparent;
-  color: #a8a29e;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 0.72rem;
+  color: #334155;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s;
 }
 
-.jumpBtn:hover, .jumpBtnActive {
-  background: rgba(200, 168, 75, 0.2);
-  border-color: rgba(200, 168, 75, 0.4);
-  color: #E2C97E;
+.jumpBtn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
 }
 
-/* ===== LEGEND BAR ===== */
-.mapLegend {
+/* ===== MINIMAP INSET (Top Right Corner) ===== */
+.minimapContainer {
   position: absolute;
   top: 16px;
-  left: 16px;
-  background: rgba(18, 22, 20, 0.88);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(200, 168, 75, 0.25);
-  border-radius: 10px;
-  padding: 10px 14px;
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  z-index: 20;
-  flex-wrap: wrap;
+  right: 16px;
+  width: 170px;
+  height: 150px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(6px);
+  border: 2px solid #1e293b;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  z-index: 30;
+  overflow: hidden;
+  cursor: pointer;
 }
 
-.legendItem {
+.minimapHeader {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 0.62rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #475569;
+  pointer-events: none;
+}
+
+.minimapSvg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.minimapViewportBox {
+  fill: rgba(239, 68, 68, 0.15);
+  stroke: #dc2626;
+  stroke-width: 2;
+  transition: all 0.05s ease-out;
+}
+
+/* ===== GIS LEGEND (Bottom Right Corner) ===== */
+.mapLegendCard {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  z-index: 30;
+  min-width: 155px;
+}
+
+.legendCardTitle {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: #0f172a;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.legendList {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.legendRow {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.75rem;
-  color: #d6d3d1;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: #334155;
   font-weight: 500;
 }
 
-.legendColor {
-  width: 12px;
+.legendSwatch {
+  width: 18px;
   height: 12px;
-  border-radius: 3px;
-  border: 1px solid rgba(0, 0, 0, 0.3);
+  border-radius: 2px;
+  border: 1px solid;
+  flex-shrink: 0;
 }
 
-.colorAvailable { background: #2e7d32; }
-.colorOccupied { background: #c62828; }
-.colorReserved { background: #e65100; }
-.colorMaintenance { background: #0277bd; }
-.colorUnavailable { background: #424242; }
+.swatchAvailable {
+  background: #c8e6c9;
+  border-color: #2e7d32;
+}
+
+.swatchReserved {
+  background: #f8bbd0;
+  border-color: #c2185b;
+}
+
+.swatchRestricted {
+  background: #ffccbc;
+  border-color: #d84315;
+}
+
+.swatchSold {
+  background: #b2ebf2;
+  border-color: #00838f;
+}
+
+.swatchOccupied {
+  background: #cfd8dc;
+  border-color: #455a64;
+}
+
+.swatchBurials {
+  background: #b0bec5;
+  border-color: #37474f;
+}
 
 /* ===== HOVER TOOLTIP ===== */
 .mapTooltip {
   position: absolute;
   pointer-events: none;
   z-index: 50;
-  background: rgba(15, 18, 16, 0.95);
+  background: rgba(15, 23, 42, 0.95);
   backdrop-filter: blur(10px);
-  border: 1px solid #C8A84B;
+  border: 1px solid #38bdf8;
   border-radius: 8px;
   padding: 10px 14px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-  min-width: 170px;
-  max-width: 250px;
-  transform: translate(-50%, -120%);
-  transition: opacity 0.12s ease-out;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  min-width: 180px;
+  transform: translate(12px, 12px);
+  color: #ffffff;
 }
 
 .tooltipTitle {
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: #E2C97E;
-  margin-bottom: 4px;
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+  font-size: 0.85rem;
+  color: #38bdf8;
+  margin-bottom: 6px;
 }
 
 .tooltipBadge {
   font-size: 0.65rem;
   padding: 2px 6px;
-  border-radius: 10px;
-  text-transform: uppercase;
+  border-radius: 4px;
   font-weight: 700;
+  text-transform: uppercase;
 }
 
 .tooltipText {
   font-size: 0.75rem;
-  color: #d6d3d1;
-  margin: 2px 0;
-  line-height: 1.35;
+  color: #cbd5e1;
+  margin-bottom: 3px;
 }
 
 .tooltipDeceased {
   margin-top: 6px;
   padding-top: 6px;
-  border-top: 1px dashed rgba(200, 168, 75, 0.3);
-  font-size: 0.78rem;
+  border-top: 1px dashed rgba(255, 255, 255, 0.2);
+  color: #f8fafc;
   font-weight: 600;
-  color: #ffffff;
+  font-size: 0.82rem;
 }
 
-/* ===== PULSING LOCATE BEACON ===== */
-@keyframes beaconPulse {
-  0% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.6); opacity: 0.4; }
-  100% { transform: scale(2.2); opacity: 0; }
-}
-
+/* Pulse animation for selected/highlighted plot */
 .pulseCircle {
-  animation: beaconPulse 1.6s infinite ease-out;
-  transform-origin: center;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    r: 32px;
+    opacity: 0.9;
+    stroke-width: 3.5px;
+  }
+  50% {
+    r: 42px;
+    opacity: 0.4;
+    stroke-width: 2px;
+  }
+  100% {
+    r: 32px;
+    opacity: 0.9;
+    stroke-width: 3.5px;
+  }
 }
