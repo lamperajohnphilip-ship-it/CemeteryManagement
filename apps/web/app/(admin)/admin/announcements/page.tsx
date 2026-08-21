@@ -113,8 +113,8 @@ export default function AnnouncementsPage() {
       title: formTitle,
       content: formContent,
       category: formCategory,
-      badge: formCategory.toUpperCase().substring(0, 6),
-      visibility: formVisibility,
+      badge: formCategory.toUpperCase(),
+      visibility: formVisibility || 'Public',
       status: status,
       validFrom: formValidFrom || '',
       validUntil: formValidUntil || '',
@@ -234,6 +234,7 @@ export default function AnnouncementsPage() {
               <select className={styles.formInput} value={formCategory} onChange={(e) => setFormCategory(e.target.value)}>
                 <option>General</option>
                 <option>Event</option>
+                <option>Notice</option>
                 <option>Holiday</option>
                 <option>Maintenance</option>
                 <option>Emergency</option>
