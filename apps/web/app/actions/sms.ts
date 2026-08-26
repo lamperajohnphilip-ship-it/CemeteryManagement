@@ -36,8 +36,8 @@ export interface SendSmsParams {
 export async function sendSmsNotification(
   phoneOrParams: string | SendSmsParams,
   legacyMessage?: string,
-  legacyRecipientName?: string,
-  legacyType?: string
+  legacyType?: string,
+  legacySentBy?: string
 ) {
   let recipient = '';
   let recipientName: string | undefined;
@@ -45,17 +45,17 @@ export async function sendSmsNotification(
   let type = 'CUSTOM';
   let sentBy = 'Admin';
 
-  if (typeof phoneOrParams === 'object') {
-    recipient = phoneOrParams.recipient || '';
-    recipientName = phoneOrParams.recipientName;
-    message = phoneOrParams.message || '';
-    type = phoneOrParams.type || 'CUSTOM';
-    sentBy = phoneOrParams.sentBy || 'Admin';
+  if (typeof phoneOrParams === 'object' && phoneOrParams !== null) {
+    recipient = (phoneOrParams as SendSmsParams).recipient || '';
+    recipientName = (phoneOrParams as SendSmsParams).recipientName;
+    message = (phoneOrParams as SendSmsParams).message || '';
+    type = (phoneOrParams as SendSmsParams).type || 'CUSTOM';
+    sentBy = (phoneOrParams as SendSmsParams).sentBy || 'Admin';
   } else {
-    recipient = phoneOrParams || '';
+    recipient = (phoneOrParams as string) || '';
     message = legacyMessage || '';
-    recipientName = legacyRecipientName;
     type = legacyType || 'CUSTOM';
+    sentBy = legacySentBy || 'Admin';
   }
 
   try {
@@ -74,10 +74,19 @@ export async function sendSmsNotification(
       };
     }
 
-    const apiKey = process.env.SEMAPHORE_API_KEY;
-    const senderName = process.env.SEMAPHORE_SENDER_NAME;
+    const rawApiKey = process.env.SEMAPHORE_API_KEY || '';
+    const rawSender = process.env.SEMAPHORE_SENDER_NAME || 'SEMAPHORE';
 
-    if (!apiKey || apiKey === 'your_semaphore_api_key_here') {
+    const apiKey = rawApiKey.trim().replace(/^["']|["']$/g, '');
+    const senderName = rawSender.trim().replace(/^["']|["']$/g, '');
+
+    const isPlaceholder =
+      !apiKey ||
+      apiKey.toLowerCase() === 'your_semaphore_api_key_here' ||
+      apiKey.toLowerCase() === 'your_new_semaphore_api_key' ||
+      apiKey.toLowerCase() === 'your_registered_sender_name';
+
+    if (isPlaceholder) {
       const devNotice =
         'SEMAPHORE_API_KEY is not configured in .env. Please add your Semaphore API key to enable SMS sending.';
       
