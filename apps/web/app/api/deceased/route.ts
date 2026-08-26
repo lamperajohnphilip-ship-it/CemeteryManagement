@@ -4,7 +4,7 @@ import { prisma } from '../../../lib/prisma';
 export async function GET() {
   try {
     const records = await prisma.deceasedRecord.findMany({
-      where: { isArchived: false },
+      where: { NOT: { isArchived: true } },
       orderBy: { createdAt: 'desc' }
     });
     return NextResponse.json({ success: true, records });

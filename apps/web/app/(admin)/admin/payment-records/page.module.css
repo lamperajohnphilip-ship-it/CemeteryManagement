@@ -287,7 +287,7 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 1380px;
+  min-width: 1680px;
   table-layout: fixed;
 }
 
@@ -309,19 +309,21 @@
   user-select: none;
 }
 
-/* Specific Column Widths */
-.table th:nth-child(1) { width: 95px; }   /* REF. NO. */
-.table th:nth-child(2) { width: 150px; }  /* PAYOR'S NAME */
-.table th:nth-child(3) { width: 150px; }  /* DECEASED */
-.table th:nth-child(4) { width: 70px; }   /* YEAR */
-.table th:nth-child(5) { width: 100px; }  /* DATE PAID */
-.table th:nth-child(6) { width: 95px; }   /* OR NO. */
-.table th:nth-child(7) { width: 95px; }   /* METHOD */
-.table th:nth-child(8) { width: 100px; }  /* DUE DATE */
-.table th:nth-child(9) { width: 90px; }   /* PAID */
-.table th:nth-child(10) { width: 90px; }  /* BALANCE */
-.table th:nth-child(11) { width: 95px; }  /* STATUS */
-.table th:nth-child(12) { width: 230px; } /* ACTIONS */
+/* 14 Specific Column Widths */
+.table th:nth-child(1) { width: 140px; }  /* REF. NO. */
+.table th:nth-child(2) { width: 135px; }  /* PAYOR'S NAME */
+.table th:nth-child(3) { width: 115px; }  /* CONTACT NO. */
+.table th:nth-child(4) { width: 145px; }  /* NAME OF DECEASED */
+.table th:nth-child(5) { width: 140px; }  /* ADDRESS */
+.table th:nth-child(6) { width: 105px; }  /* DATE OF BIRTH */
+.table th:nth-child(7) { width: 105px; }  /* DATE OF DEATH */
+.table th:nth-child(8) { width: 70px; }   /* YEAR */
+.table th:nth-child(9) { width: 95px; }   /* TOTAL DUE */
+.table th:nth-child(10) { width: 95px; }  /* PAID */
+.table th:nth-child(11) { width: 105px; } /* BALANCE */
+.table th:nth-child(12) { width: 95px; }  /* STATUS */
+.table th:nth-child(13) { width: 120px; } /* REMARKS */
+.table th:nth-child(14) { width: 220px; } /* ACTIONS */
 
 .table th:hover {
   color: #E2C97E;

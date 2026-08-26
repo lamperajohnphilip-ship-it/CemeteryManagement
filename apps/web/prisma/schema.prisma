@@ -34,12 +34,46 @@ model DeceasedRecord {
   archivedAt       DateTime?
   archiveReason    String?
 
-  gravePlot        GravePlot?
+  payments         PaymentRecord[]
 
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   @@map("deceased_records")
+}
+
+model PaymentRecord {
+  id               String          @id @default(cuid())
+  REF_NO           String          @unique
+  PAYORS_NAME      String
+  CONTACT_NO       String?
+  NAME_OF_DECEASED String
+  ADDRESS          String?
+  DATE_OF_BIRTH    DateTime?
+  DATE_OF_DEATH    DateTime?
+  YEAR             Int
+  TOTAL_DUE        Float           @default(0)
+  PAID             Float           @default(0)
+  BALANCE          Float           @default(0)
+  STATUS           String          @default("UNPAID")
+  REMARKS          String?
+  
+  OR_NO            String?
+  DATE_PAID        String?
+  METHOD           String?         @default("Cash")
+  DUE_DATE         String?
+
+  deceasedRecordId String?
+  deceasedRecord   DeceasedRecord? @relation(fields: [deceasedRecordId], references: [id], onDelete: SetNull)
+
+  isArchived       Boolean         @default(false)
+  archivedAt       DateTime?
+  archiveReason    String?
+
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@map("payment_records")
 }
 
 model Inquiries {
@@ -107,21 +141,20 @@ model AnnouncementComment {
   @@map("announcement_comments")
 }
 
-model GravePlot {
-  id             String          @id @default(cuid())
-  plotNumber     String          @unique // e.g. "A-001", "A-002", "B-015", "C-050"
-  section        String          // "A", "B", "C"
-  row            Int
-  column         Int
-  status         String          @default("Available") // "Available", "Occupied", "Reserved", "Maintenance", "Unavailable"
-  plotType       String          @default("Standard Ground Plot") // "Standard Ground Plot", "Mausoleum", "Lawn Lot", "Niche"
-  notes          String?
-  
-  deceasedId     String?         @unique
-  deceasedRecord DeceasedRecord? @relation(fields: [deceasedId], references: [id], onDelete: SetNull)
+model SmsNotification {
+  id            String   @id @default(cuid())
+  recipient     String
+  recipientName String?
+  message       String
+  semaphoreId   String?
+  status        String   @default("Pending") // 'Queued', 'Pending', 'Sent', 'Failed', 'Refunded'
+  type          String?  @default("CUSTOM")  // 'INQUIRY_APPROVED', 'INQUIRY_REJECTED', 'PAYMENT_RECEIVED', 'PAYMENT_REMINDER', 'BURIAL_RECORDED', 'ANNOUNCEMENT', 'CUSTOM'
+  senderName    String?
+  sentBy        String?  // Admin email, username, or 'SYSTEM'
+  errorMessage  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-
-  @@map("grave_plots")
+  @@map("sms_notifications")
 }
+

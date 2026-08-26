@@ -1,12 +1,31 @@
 /* ============================================================
-   CEMETERY DATA (unchanged)
+   CEMETERY DATA & LIVE SUPABASE INTEGRATION
 ============================================================ */
+let DB_DECEASED = [];
+
 const CEMETERIES = {
   bobontugan: { name:'Bobontugan Cemetery',  location:'Brgy. Bobontugan, Jasaan', total:142, occupied:108, available:34, sections:3, rows:10, cols:14, rate:0.76 },
   public:     { name:'Public Cemetery',       location:'Poblacion, Jasaan',        total:247, occupied:183, available:64, sections:3, rows:13, cols:19, rate:0.74 },
   private:    { name:'Private Cemetery',      location:'Jasaan, Misamis Oriental', total:98,  occupied:71,  available:27, sections:2, rows:7,  cols:14, rate:0.72 },
   meedu:      { name:'Meedu Cemetery',        location:'Brgy. Meedu, Jasaan',      total:63,  occupied:44,  available:19, sections:2, rows:7,  cols:9,  rate:0.70 },
 };
+
+async function fetchSupabaseDeceased() {
+  try {
+    const res = await fetch('/api/deceased');
+    const data = await res.json();
+    if (data.success && data.records) {
+      DB_DECEASED = data.records;
+      const occ = DB_DECEASED.length;
+      if (CEMETERIES.public) {
+        CEMETERIES.public.occupied = occ;
+        CEMETERIES.public.available = Math.max(0, CEMETERIES.public.total - occ);
+      }
+    }
+  } catch(e) {
+    console.warn("Failed to fetch live deceased records for 3D map", e);
+  }
+}
 
 /* ============================================================
    LOCATE GRAVE STATE
@@ -17,6 +36,19 @@ let pinMeshes = [];
 
 function loadLocateGrave() {
   try {
+    // 1. Check URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const locateParam = urlParams.get('locate') || urlParams.get('search') || urlParams.get('name');
+    if (locateParam) {
+      try {
+        LOCATE_GRAVE = JSON.parse(locateParam);
+      } catch(e) {
+        LOCATE_GRAVE = { name: locateParam, plot: 'A-1', section: 'A' };
+      }
+      return;
+    }
+
+    // 2. Check sessionStorage
     const raw = sessionStorage.getItem('locateGrave');
     if (raw) {
       LOCATE_GRAVE = JSON.parse(raw);
@@ -25,6 +57,24 @@ function loadLocateGrave() {
     }
   } catch(e) { LOCATE_GRAVE = null; }
 }
+
+window.searchAndLocateGrave = function(name) {
+  if (!name) return;
+  const q = name.trim().toLowerCase();
+  const target = plotMeshes.find(m => {
+    const gd = m.userData.graveData;
+    if (!gd || !gd.name) return false;
+    return gd.name.toLowerCase().includes(q);
+  });
+  if (target && target.userData.graveData) {
+    targetPlotMesh = target;
+    LOCATE_GRAVE = target.userData.graveData;
+    flyToTarget();
+    showGravePopup(target.userData.graveData);
+  } else {
+    alert(`No deceased record found matching "${name}" in this cemetery.`);
+  }
+};
 
 function plotToGridPos(plotStr, rows, cols) {
   const match = plotStr.match(/([A-Ca-c])-?(\d+)/);
@@ -134,8 +184,9 @@ let plotMeshes=[];
 let showOcc=true,showAvail=true,showPaths=true;
 let activeCem=null;
 
-function openView(key) {
+async function openView(key) {
   activeCem=key;
+  await fetchSupabaseDeceased();
   const d=CEMETERIES[key];
   document.getElementById('v3Title').textContent=d.name;
   document.getElementById('v3InfoName').textContent=d.name;
@@ -217,26 +268,23 @@ function init3D(key) {
     if (LOCATE_GRAVE && targetPlotMesh) {
       flyToTarget();
       showLocateBanner();
-      setTimeout(()=>showGravePopup(), 900);
+      setTimeout(()=>showGravePopup(targetPlotMesh.userData.graveData || LOCATE_GRAVE), 900);
     }
   },700);
   renderLoop();
 }
 
 /* ============================================================
-   BUILD SCENE (unchanged)
-   ★ KEY CHANGE: Pin is placed ON TOP of the tomb's headstone cap
+   BUILD SCENE WITH SUPABASE DATA
 ============================================================ */
 function buildScene(d) {
   plotMeshes=[];pinMeshes=[];targetPlotMesh=null;
   const rows=d.rows,cols=d.cols;
-  const total=rows*cols,occ=Math.floor(total*d.rate);
-  const shuffled=[...Array(total).keys()].sort(()=>Math.random()-0.5);
-  const occSet=new Set(shuffled.slice(0,occ));
+  const total=rows*cols;
   const SX=1.45,SZ=1.45,gW=cols*SX,gH=rows*SZ;
 
   let targetGridCol=-1,targetGridRow=-1;
-  if (LOCATE_GRAVE) {
+  if (LOCATE_GRAVE && LOCATE_GRAVE.plot) {
     const pos = plotToGridPos(LOCATE_GRAVE.plot, rows, cols);
     targetGridCol=pos.col; targetGridRow=pos.row;
   }
@@ -262,106 +310,144 @@ function buildScene(d) {
 
   // Plot grid
   const startX=-(cols-1)/2*SX,startZ=-(rows-1)/2*SZ;
+  let dbSeqIndex = 0;
+
   for(let r=0;r<rows;r++){
     for(let c=0;c<cols;c++){
-      const idx=r*cols+c;
-      const isTarget=(c===targetGridCol && r===targetGridRow);
-      const isOcc=isTarget?true:occSet.has(idx);
-      if(isOcc&&!showOcc&&!isTarget) continue;
-      if(!isOcc&&!showAvail) continue;
       const x=startX+c*SX,z=startZ+r*SZ;
       if(Math.abs(x)<0.5||Math.abs(z)<0.5) continue;
 
-      const h=isOcc?0.09+Math.random()*0.05:0.03;
+      const secCols = Math.floor(cols/3);
+      const secLetter = c < secCols ? 'A' : (c < secCols * 2 ? 'B' : 'C');
+      const plotNum = (r * 4) + (c % 4) + 1;
+      const plotId = `${secLetter}-${plotNum}`;
+
+      // Check database match
+      let rec = DB_DECEASED.find(dRec => {
+        if (!dRec.REMARKS) return false;
+        const rem = dRec.REMARKS.trim().toLowerCase();
+        return rem === plotId.toLowerCase() || rem.includes(plotId.toLowerCase());
+      });
+
+      if (!rec && dbSeqIndex < DB_DECEASED.length) {
+        rec = DB_DECEASED[dbSeqIndex];
+        dbSeqIndex++;
+      }
+
+      let isOcc = !!rec;
+      let isTarget = (c===targetGridCol && r===targetGridRow);
+
+      if (LOCATE_GRAVE && rec && LOCATE_GRAVE.name) {
+        if (rec.NAME_OF_DECEASED && rec.NAME_OF_DECEASED.toLowerCase().includes(LOCATE_GRAVE.name.toLowerCase())) {
+          isTarget = true;
+        }
+      }
+
+      if(isOcc&&!showOcc&&!isTarget) continue;
+      if(!isOcc&&!showAvail) continue;
+
+      let graveData = null;
+      if (rec) {
+        graveData = {
+          name: rec.NAME_OF_DECEASED,
+          plot: plotId,
+          section: secLetter,
+          born: rec.DATE_OF_BIRTH,
+          died: rec.DATE_OF_DEATH,
+          kin: rec.PAYORS_NAME || 'Family',
+          contact: rec.CONTACT_NO || '—',
+          address: rec.ADDRESS || 'Jasaan',
+          status: rec.STATUS || 'paid',
+          balance: rec.BALANCE || 0,
+          totalDue: rec.TOTAL_DUE || 500,
+          paid: rec.PAID || 500,
+          age: rec.DATE_OF_BIRTH && rec.DATE_OF_DEATH 
+            ? Math.max(1, new Date(rec.DATE_OF_DEATH).getFullYear() - new Date(rec.DATE_OF_BIRTH).getFullYear()) 
+            : '—',
+          cause: 'Natural Causes',
+          religion: 'Catholic',
+          nationality: 'Filipino'
+        };
+      } else if (isTarget && LOCATE_GRAVE) {
+        graveData = LOCATE_GRAVE;
+        isOcc = true;
+      }
+
+      const h=isOcc?0.09:0.03;
       const pColor=isTarget?0xff9922:isOcc?0xc9a84c:0x4a6741;
       const mat=new THREE.MeshLambertMaterial({color:pColor});
       if(isTarget) mat.emissive=new THREE.Color(0x331100);
       const plotMesh=new THREE.Mesh(new THREE.BoxGeometry(0.92,h,0.92),mat);
       plotMesh.position.set(x,h/2,z); plotMesh.castShadow=true; plotMesh.receiveShadow=true;
-      plotMesh.userData={isOccupied:isOcc,origColor:pColor,isTarget:isTarget,graveData:isTarget?LOCATE_GRAVE:null};
+      plotMesh.userData={
+        isOccupied:isOcc,
+        origColor:pColor,
+        isTarget:isTarget,
+        plotId:plotId,
+        graveData:graveData
+      };
       scene.add(plotMesh); plotMeshes.push(plotMesh);
       if(isTarget) targetPlotMesh=plotMesh;
 
       if(isOcc){
-        // Headstone height — taller for target grave so it stands out
-        const hsH=isTarget?0.55:0.28+Math.random()*0.32;
+        // Headstone height
+        const hsH=isTarget?0.55:0.32;
         const hsMat=new THREE.MeshLambertMaterial({color:isTarget?0xffaa44:0x7a7268});
         const hs=new THREE.Mesh(new THREE.BoxGeometry(0.14,hsH,0.07),hsMat);
         hs.position.set(x,h+hsH/2,z-0.38); hs.castShadow=true; scene.add(hs);
+        hs.userData = plotMesh.userData;
 
         // Round cap on top of headstone
         const capMat=new THREE.MeshLambertMaterial({color:isTarget?0xffbb55:0x8a8278});
         const cap=new THREE.Mesh(new THREE.SphereGeometry(0.075,8,4),capMat);
         cap.position.set(x,h+hsH,z-0.38); scene.add(cap);
+        cap.userData = plotMesh.userData;
 
-        // ★ TARGET GRAVE — pin placed directly on top of the headstone cap
+        // ★ TARGET GRAVE PIN
         if(isTarget){
-          // The exact Y where the top of the headstone cap sits
-          const headstoneTopY = h + hsH + 0.075; // slab top + headstone height + cap radius
+          const headstoneTopY = h + hsH + 0.075;
 
-          // ── Ground glow disc beneath the tomb ──
           const glowDisc=new THREE.Mesh(
             new THREE.CircleGeometry(1.0,32),
             new THREE.MeshLambertMaterial({color:0xff4400,transparent:true,opacity:0.2})
           );
           glowDisc.rotation.x=-Math.PI/2; glowDisc.position.set(x,0.02,z-0.38); scene.add(glowDisc);
 
-          // ── Pulsing target ring on the ground below the headstone ──
           const ringMat=new THREE.MeshLambertMaterial({color:0xff6600,transparent:true,opacity:0.55});
           const ring=new THREE.Mesh(new THREE.TorusGeometry(0.7,0.06,8,32),ringMat);
           ring.rotation.x=Math.PI/2; ring.position.set(x,0.04,z-0.38);
           ring.userData={isRing:true}; scene.add(ring); pinMeshes.push(ring);
 
-          // ── Very short stem sitting right on top of the headstone cap ──
-          // This anchors the pin visually to the tomb
           const stemMat=new THREE.MeshLambertMaterial({color:0xcc3300});
-          const stemHeight = 0.35; // short — just a connector from cap to pin head
+          const stemHeight = 0.35;
           const stem=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.055,stemHeight,10),stemMat);
-          // Position stem so its bottom touches the headstone cap top
           stem.position.set(x, headstoneTopY + stemHeight/2, z-0.38);
           stem.castShadow=true; scene.add(stem);
-          stem.userData={isPin:true,graveData:LOCATE_GRAVE}; pinMeshes.push(stem);
+          stem.userData={isPin:true,graveData:graveData}; pinMeshes.push(stem);
 
-          // ── Teardrop PIN HEAD — sits directly on top of stem / headstone ──
           const pinHeadGroup=new THREE.Group();
-          // Base Y = top of stem
           const pinBaseY = headstoneTopY + stemHeight;
           pinHeadGroup.position.set(x, pinBaseY, z-0.38);
 
-          // Main sphere body (bright red-orange map pin)
           const pinBodyMat=new THREE.MeshLambertMaterial({color:0xff2200,emissive:new THREE.Color(0x550000)});
           const pinBody=new THREE.Mesh(new THREE.SphereGeometry(0.55,20,14),pinBodyMat);
-          pinBody.userData={isPin:true,graveData:LOCATE_GRAVE}; pinBody.castShadow=true;
+          pinBody.userData={isPin:true,graveData:graveData}; pinBody.castShadow=true;
           pinHeadGroup.add(pinBody);
 
-          // White inner dot (classic map pin look)
           const innerMat=new THREE.MeshLambertMaterial({color:0xffffff});
           const inner=new THREE.Mesh(new THREE.SphereGeometry(0.22,12,10),innerMat);
           inner.position.set(0,0,0.38);
-          inner.userData={isPin:true,graveData:LOCATE_GRAVE};
+          inner.userData={isPin:true,graveData:graveData};
           pinHeadGroup.add(inner);
 
-          // Bottom point of teardrop pointing downward into the headstone
           const pointMat=new THREE.MeshLambertMaterial({color:0xdd1100,emissive:new THREE.Color(0x330000)});
           const point=new THREE.Mesh(new THREE.ConeGeometry(0.22,0.55,12),pointMat);
-          // Cone points down — position it below the sphere center
           point.position.set(0,-0.65,0); point.rotation.z=Math.PI;
-          point.userData={isPin:true,graveData:LOCATE_GRAVE}; point.castShadow=true;
+          point.userData={isPin:true,graveData:graveData}; point.castShadow=true;
           pinHeadGroup.add(point);
 
-          // Sheen highlight for 3D depth
-          const hlMat=new THREE.MeshLambertMaterial({color:0xff7755,transparent:true,opacity:0.6});
-          const hl=new THREE.Mesh(new THREE.SphereGeometry(0.28,10,8),hlMat);
-          hl.position.set(0.14,0.24,0.18);
-          pinHeadGroup.add(hl);
-
           scene.add(pinHeadGroup);
-
-          // Store animation state — baseY is the resting position on the headstone
-          pinHeadGroup.userData={isPin:true,graveData:LOCATE_GRAVE,isPinGroup:true,baseY:pinBaseY};
-          pinBody.userData.graveData=LOCATE_GRAVE;
-          inner.userData.graveData=LOCATE_GRAVE;
-          point.userData.graveData=LOCATE_GRAVE;
+          pinHeadGroup.userData={isPin:true,graveData:graveData,isPinGroup:true,baseY:pinBaseY};
 
           pinMeshes.push(pinBody); pinMeshes.push(inner); pinMeshes.push(point);
           pinMeshes.push(stem); pinMeshes.push(plotMesh);
@@ -817,8 +903,26 @@ function bindControls(canvas, W, H) {
     plotMeshes.forEach(m=>{ if(!m.userData.isTarget) m.material.color.setHex(m.userData.origColor); });
     if(hits.length>0){
       const hit=hits[0].object;
-      if(hit.userData.isTarget&&hit.userData.graveData){ showGravePopup(hit.userData.graveData); flyToTarget(); }
-      else if(!hit.userData.isTarget){ hit.material.color.setHex(0xff9922); }
+      if(hit.userData.graveData){
+        hit.material.color.setHex(0xff9922);
+        showGravePopup(hit.userData.graveData);
+      } else {
+        hit.material.color.setHex(0x81c784);
+        const availData = {
+          name: 'Available Grave Plot',
+          plot: hit.userData.plotId || 'Vacant',
+          section: hit.userData.plotId ? hit.userData.plotId.split('-')[0] : 'A',
+          born: '—',
+          died: '—',
+          age: '—',
+          cause: 'Available for Burial / Reservation',
+          religion: 'All Faiths',
+          nationality: '—',
+          kin: 'Municipal Cemetery Office',
+          contact: 'Jasaan LGU (088) 123-4567'
+        };
+        showGravePopup(availData);
+      }
     }
   });
 

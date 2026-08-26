@@ -2,15 +2,22 @@
 
 import { useState, useEffect } from 'react';
 import styles from './page.module.css';
+import { getPaymentRecords, addPaymentRecord, updatePaymentRecord, archivePaymentRecord } from '../../../actions/payments';
 import { getDeceasedRecords } from '../../../actions/deceased';
+import { sendSmsNotification } from '../../../actions/sms';
 
 interface PaymentRecord {
   id: string;
   payorName: string;
   deceasedName: string;
+  contactNo: string;
+  address: string;
+  birthDate: string;
+  deathDate: string;
   orNo: string;
   amountDue: number;
   amountPaid: number;
+  balance: number;
   datePaid: string;
   method: string;
   yearCovered: string;
@@ -18,11 +25,14 @@ interface PaymentRecord {
   remarks: string;
   status: string;
   ref: string;
+  deceasedRecordId?: string;
 }
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [filteredPayments, setFilteredPayments] = useState<PaymentRecord[]>([]);
+  const [deceasedList, setDeceasedList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,8 +62,57 @@ export default function PaymentsPage() {
   const [addAmountPaid, setAddAmountPaid] = useState('');
   const [editAmountDue, setEditAmountDue] = useState('');
   const [editAmountPaid, setEditAmountPaid] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // SMS Reminder States
+  const [showSmsReminderModal, setShowSmsReminderModal] = useState(false);
+  const [smsTargetPayment, setSmsTargetPayment] = useState<PaymentRecord | null>(null);
+  const [smsReminderText, setSmsReminderText] = useState('');
+  const [isSendingSmsReminder, setIsSendingSmsReminder] = useState(false);
+
+  const openSmsReminderModal = (p: PaymentRecord) => {
+    setSmsTargetPayment(p);
+    const bal = typeof p.balance === 'number' ? p.balance : Math.max(0, p.amountDue - p.amountPaid);
+    const dueDateStr = p.dueDate ? `, due on ${p.dueDate}` : '';
+    const msg = `Good day, ${p.payorName}. This is a friendly reminder regarding the cemetery payment for ${p.deceasedName}. Outstanding balance: ₱${bal.toLocaleString()}${dueDateStr}. Please settle at the Municipality of Jasaan Cemetery Office. Thank you.`;
+    setSmsReminderText(msg);
+    setShowSmsReminderModal(true);
+  };
+
+  const handleSendSmsReminder = async () => {
+    if (!smsTargetPayment) return;
+    const phone = smsTargetPayment.contactNo;
+    if (!phone || phone === '—') {
+      alert('This payor record does not have a contact number registered.');
+      return;
+    }
+
+    setIsSendingSmsReminder(true);
+    try {
+      const res = await sendSmsNotification({
+        recipient: phone,
+        recipientName: smsTargetPayment.payorName,
+        message: smsReminderText,
+        type: 'PAYMENT_REMINDER',
+        sentBy: 'Admin Superuser',
+      });
+
+      if (res.success) {
+        alert(`✅ SMS payment reminder sent to ${smsTargetPayment.payorName} (${phone}) via Semaphore!`);
+        setShowSmsReminderModal(false);
+      } else {
+        alert(`⚠️ SMS Delivery Warning: ${res.error || 'Failed to send SMS.'}`);
+      }
+    } catch (err: any) {
+      alert(`Error sending SMS: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsSendingSmsReminder(false);
+    }
+  };
+
 
   // Form states
+  const [formDeceasedId, setFormDeceasedId] = useState('');
   const [formDeceased, setFormDeceased] = useState('');
   const [formOR, setFormOR] = useState('');
   const [formAmountDue, setFormAmountDue] = useState('');
@@ -71,115 +130,137 @@ export default function PaymentsPage() {
 
   useEffect(() => {
     loadData();
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'cemeteryPayments') loadData();
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   const loadData = async () => {
-    let dbRecords: PaymentRecord[] = [];
+    setLoading(true);
     try {
-      const res = await getDeceasedRecords();
-      if (res.success && res.records) {
-        dbRecords = res.records.map((r: any) => ({
-          id: r.id,
-          payorName: r.PAYORS_NAME || 'Unknown',
-          deceasedName: r.NAME_OF_DECEASED || 'Unknown',
-          orNo: '',
-          amountDue: r.TOTAL_DUE || 0,
-          amountPaid: r.PAID || 0,
-          datePaid: '',
-          method: '',
-          yearCovered: r.YEAR?.toString() || new Date().getFullYear().toString(),
-          dueDate: '',
-          remarks: r.REMARKS || '',
-          status: 'pending',
-          ref: r.REF_NO || `PAY-${Math.floor(1000 + Math.random() * 9000)}`
-        }));
+      // 1. Fetch from the dedicated Payment Records table in Supabase
+      const [payRes, decRes] = await Promise.all([
+        getPaymentRecords(),
+        getDeceasedRecords(),
+      ]);
+
+      if (decRes.success && decRes.records) {
+        setDeceasedList(decRes.records);
       }
-    } catch(e) {
-      console.error("Failed to load deceased records from DB", e);
-    }
 
-    const saved = localStorage.getItem('cemeteryPayments');
-    const today = new Date().toISOString().split('T')[0] || '';
-    const getComputedStatus = (p: any) => {
-      const dueVal = parseFloat(p.amountDue as any) || 0;
-      const paidVal = parseFloat(p.amountPaid as any) || 0;
-      if (paidVal >= dueVal && dueVal > 0) return 'paid';
-      if (paidVal >= dueVal && dueVal === 0 && paidVal > 0) return 'paid';
-      if (p.dueDate && p.dueDate < today) return 'overdue';
-      if (paidVal > 0 && paidVal < dueVal) return 'overdue';
-      if (p.status === 'partial') return 'overdue';
-      return p.status || 'pending';
-    };
+      let allRecords: PaymentRecord[] = [];
 
-    let localPayments: PaymentRecord[] = [];
-    if (saved) {
-      try {
-        localPayments = JSON.parse(saved);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    // Merge DB records into localPayments
-    const localNamesMap = new Map<string, number>();
-    localPayments.forEach((p, idx) => localNamesMap.set(p.deceasedName.toLowerCase(), idx));
-
-    for (const dbr of dbRecords) {
-      if (!localNamesMap.has(dbr.deceasedName.toLowerCase())) {
-        localPayments.push(dbr);
-      } else {
-        const idx = localNamesMap.get(dbr.deceasedName.toLowerCase());
-        if (idx !== undefined && localPayments[idx]) {
-          localPayments[idx].amountDue = dbr.amountDue;
-          if (dbr.amountPaid > localPayments[idx].amountPaid) {
-            localPayments[idx].amountPaid = dbr.amountPaid;
+      if (payRes.success && payRes.records && payRes.records.length > 0) {
+        allRecords = payRes.records.map((r: any) => {
+          const totalDue = parseFloat(r.TOTAL_DUE as any) || 0;
+          const paid = parseFloat(r.PAID as any) || 0;
+          const balance = typeof r.BALANCE === 'number' ? r.BALANCE : Math.max(0, totalDue - paid);
+          const statusLower = (r.STATUS || '').toLowerCase();
+          
+          let computedStatus = 'pending';
+          if (paid >= totalDue && totalDue > 0) {
+            computedStatus = 'paid';
+          } else if (paid > 0 && paid < totalDue) {
+            computedStatus = 'overdue';
+          } else if (statusLower === 'paid') {
+            computedStatus = 'paid';
+          } else if (statusLower === 'partial' || statusLower === 'overdue') {
+            computedStatus = 'overdue';
+          } else {
+            computedStatus = 'pending';
           }
-        }
+
+          const birthDateStr = r.DATE_OF_BIRTH ? new Date(r.DATE_OF_BIRTH).toISOString().split('T')[0] : (r.deceasedRecord?.DATE_OF_BIRTH ? new Date(r.deceasedRecord.DATE_OF_BIRTH).toISOString().split('T')[0] : '');
+          const deathDateStr = r.DATE_OF_DEATH ? new Date(r.DATE_OF_DEATH).toISOString().split('T')[0] : (r.deceasedRecord?.DATE_OF_DEATH ? new Date(r.deceasedRecord.DATE_OF_DEATH).toISOString().split('T')[0] : '');
+
+          return {
+            id: r.id,
+            ref: r.REF_NO || `PAY-${r.id.slice(0, 6)}`,
+            payorName: r.PAYORS_NAME || 'Unknown Payor',
+            contactNo: r.CONTACT_NO || r.deceasedRecord?.CONTACT_NO || '—',
+            deceasedName: r.NAME_OF_DECEASED || 'Unknown Deceased',
+            address: r.ADDRESS || r.deceasedRecord?.ADDRESS || '—',
+            birthDate: birthDateStr || '—',
+            deathDate: deathDateStr || '—',
+            yearCovered: r.YEAR ? r.YEAR.toString() : new Date().getFullYear().toString(),
+            amountDue: totalDue,
+            amountPaid: paid,
+            balance: balance,
+            orNo: r.OR_NO || '',
+            datePaid: r.DATE_PAID || (r.createdAt ? new Date(r.createdAt).toISOString().split('T')[0] : ''),
+            method: r.METHOD || 'Cash',
+            dueDate: r.DUE_DATE || '',
+            remarks: r.REMARKS || '—',
+            status: computedStatus,
+            deceasedRecordId: r.deceasedRecordId || undefined,
+          };
+        });
+      } else if (decRes.success && decRes.records && decRes.records.length > 0) {
+        // If payment_records table is fresh, display deceased records as base entries
+        allRecords = decRes.records.map((r: any) => {
+          const totalDue = parseFloat(r.TOTAL_DUE as any) || 0;
+          const paid = parseFloat(r.PAID as any) || 0;
+          const balance = typeof r.BALANCE === 'number' ? r.BALANCE : Math.max(0, totalDue - paid);
+          const statusLower = (r.STATUS || '').toLowerCase();
+          
+          let computedStatus = 'pending';
+          if (paid >= totalDue && totalDue > 0) {
+            computedStatus = 'paid';
+          } else if (paid > 0 && paid < totalDue) {
+            computedStatus = 'overdue';
+          } else if (statusLower === 'paid') {
+            computedStatus = 'paid';
+          } else if (statusLower === 'partial' || statusLower === 'overdue') {
+            computedStatus = 'overdue';
+          } else {
+            computedStatus = 'pending';
+          }
+
+          const birthDateStr = r.DATE_OF_BIRTH ? new Date(r.DATE_OF_BIRTH).toISOString().split('T')[0] : '';
+          const deathDateStr = r.DATE_OF_DEATH ? new Date(r.DATE_OF_DEATH).toISOString().split('T')[0] : '';
+
+          return {
+            id: r.id,
+            ref: r.REF_NO || `REF-${r.id.slice(0, 6)}`,
+            payorName: r.PAYORS_NAME || 'Unknown Payor',
+            contactNo: r.CONTACT_NO || '—',
+            deceasedName: r.NAME_OF_DECEASED || 'Unknown Deceased',
+            address: r.ADDRESS || '—',
+            birthDate: birthDateStr || '—',
+            deathDate: deathDateStr || '—',
+            yearCovered: r.YEAR ? r.YEAR.toString() : new Date().getFullYear().toString(),
+            amountDue: totalDue,
+            amountPaid: paid,
+            balance: balance,
+            orNo: '',
+            datePaid: (r.updatedAt ? new Date(r.updatedAt).toISOString().split('T')[0] : '') || '',
+            method: 'Cash',
+            dueDate: '',
+            remarks: r.REMARKS || '—',
+            status: computedStatus,
+            deceasedRecordId: r.id,
+          };
+        });
       }
-    }
 
-    // Exclude previously deleted records
-    let deletedIds: string[] = [];
-    try {
-      deletedIds = JSON.parse(localStorage.getItem('deletedPaymentIds') || '[]');
-    } catch (e) {}
-
-    localPayments = localPayments.filter(p => !deletedIds.includes(p.id) && !deletedIds.includes(p.ref));
-
-    if (localPayments.length > 0) {
-      const parsed = localPayments.map((p: any) => ({ ...p, status: getComputedStatus(p) }));
-      setPayments(parsed);
-      setFilteredPayments(parsed);
-      localStorage.setItem('cemeteryPayments', JSON.stringify(parsed));
-    } else {
-      const mockPayments = [
-        { id: '1', payorName: 'Juan Dela Cruz', deceasedName: 'Maria Dela Cruz', orNo: 'OR-2026-0001', amountDue: 500, amountPaid: 500, datePaid: '2026-03-01', method: 'Cash', yearCovered: '2026', dueDate: '2026-03-15', remarks: '', status: 'paid', ref: 'PAY-1001' },
-        { id: '2', payorName: 'Maria Santos', deceasedName: 'Pedro Santos', orNo: 'OR-2026-0002', amountDue: 750, amountPaid: 400, datePaid: '2026-02-15', method: 'GCash', yearCovered: '2026', dueDate: '2026-02-28', remarks: 'Partial payment', status: 'overdue', ref: 'PAY-1002' },
-        { id: '3', payorName: 'Jose Rodriguez', deceasedName: 'Ana Rodriguez', orNo: '', amountDue: 600, amountPaid: 0, datePaid: '', method: '', yearCovered: '2025', dueDate: '2025-12-15', remarks: '', status: 'overdue', ref: 'PAY-1003' },
-      ].filter(p => !deletedIds.includes(p.id) && !deletedIds.includes(p.ref));
-      setPayments(mockPayments);
-      setFilteredPayments(mockPayments);
-      localStorage.setItem('cemeteryPayments', JSON.stringify(mockPayments));
+      setPayments(allRecords);
+      setFilteredPayments(allRecords);
+    } catch (e) {
+      console.error("Failed to load payment records from DB", e);
+    } finally {
+      setLoading(false);
     }
 
     setAuditLogs([
-      { ts: new Date().toISOString(), user: 'Admin Jasaan', action: 'System started' }
+      { ts: new Date().toISOString(), user: 'Admin Jasaan', action: 'Connected to Supabase payment_records table' }
     ]);
   };
 
   useEffect(() => {
     let result = [...payments];
 
-    // Remove redundant identical records (e.g., from duplicate imports)
+    // Remove redundant identical records if any
     const uniqueResult: PaymentRecord[] = [];
     const seen = new Set();
     for (const p of result) {
-      const key = `${p.deceasedName}-${p.orNo}-${p.amountPaid}-${p.datePaid}-${p.payorName}`;
+      const key = `${p.id}-${p.deceasedName}-${p.ref}`;
       if (!seen.has(key)) {
         seen.add(key);
         uniqueResult.push(p);
@@ -192,6 +273,8 @@ export default function PaymentsPage() {
       result = result.filter(p => 
         (p.payorName || '').toLowerCase().includes(sq) || 
         (p.deceasedName || '').toLowerCase().includes(sq) || 
+        (p.contactNo || '').toLowerCase().includes(sq) || 
+        (p.address || '').toLowerCase().includes(sq) || 
         (p.orNo || '').toLowerCase().includes(sq) || 
         (p.ref || '').toLowerCase().includes(sq)
       );
@@ -224,43 +307,45 @@ export default function PaymentsPage() {
     }
   };
 
+  const fmtCurrency = (n: number) => {
+    return (parseFloat(n as any) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
   const calculateBalance = (deceasedName: string) => {
-    const records = payments.filter(p => p.deceasedName === deceasedName);
+    const records = payments.filter(p => p.deceasedName.toLowerCase() === deceasedName.toLowerCase());
     if (records.length === 0) return 0;
     const totalDue = Math.max(...records.map(r => r.amountDue));
     const totalPaid = records.reduce((sum, r) => sum + r.amountPaid, 0);
     return Math.max(0, totalDue - totalPaid);
   };
 
-  const deceasedSuggestions = payments
-    .filter(p => !formDeceased || (p.deceasedName || '').toLowerCase().includes(formDeceased.toLowerCase()))
-    .reduce((unique: PaymentRecord[], item) => {
-      if (!unique.find(i => i.deceasedName === item.deceasedName)) unique.push(item);
+  const deceasedSuggestions = [
+    ...payments.map(p => ({
+      id: p.deceasedRecordId || p.id,
+      deceasedName: p.deceasedName,
+      payorName: p.payorName,
+      yearCovered: p.yearCovered,
+      amountDue: p.amountDue,
+      contactNo: p.contactNo,
+      address: p.address,
+    })),
+    ...deceasedList.map(d => ({
+      id: d.id,
+      deceasedName: d.NAME_OF_DECEASED,
+      payorName: d.PAYORS_NAME,
+      yearCovered: d.YEAR?.toString() || new Date().getFullYear().toString(),
+      amountDue: d.TOTAL_DUE || 0,
+      contactNo: d.CONTACT_NO || '',
+      address: d.ADDRESS || '',
+    }))
+  ]
+    .filter(p => !formDeceased || (p.deceasedName || '').toLowerCase().includes(formDeceased.toLowerCase()) || (p.payorName || '').toLowerCase().includes(formDeceased.toLowerCase()))
+    .reduce((unique: any[], item) => {
+      if (!unique.find(i => (i.deceasedName || '').toLowerCase() === (item.deceasedName || '').toLowerCase())) {
+        unique.push(item);
+      }
       return unique;
     }, []);
-
-  const syncInventoryBalance = (deceasedName: string, updatedPaymentsList: PaymentRecord[]) => {
-    const rawInv = localStorage.getItem('cemeteryInventory');
-    if (!rawInv) return;
-    try {
-      let inv = JSON.parse(rawInv);
-      const idx = inv.findIndex((r: any) => (r.deceased || '').toLowerCase() === deceasedName.toLowerCase());
-      if (idx !== -1) {
-        const related = updatedPaymentsList.filter(p => (p.deceasedName || '').toLowerCase() === deceasedName.toLowerCase());
-        const totalPaid = related.reduce((sum, p) => sum + (parseFloat(p.amountPaid as any) || 0), 0);
-        const totalDue = related.length > 0 ? Math.max(...related.map(r => parseFloat(r.amountDue as any) || 0)) : inv[idx].totalAmount;
-        const balance = Math.max(0, totalDue - totalPaid);
-        let newStatus = 'pending';
-        if (totalDue > 0 && totalPaid >= totalDue) newStatus = 'paid';
-        else if (totalPaid > 0) newStatus = 'overdue';
-        inv[idx].amountPaid = totalPaid;
-        inv[idx].totalAmount = totalDue;
-        inv[idx].balance = balance;
-        inv[idx].paymentStatus = newStatus;
-        localStorage.setItem('cemeteryInventory', JSON.stringify(inv));
-      }
-    } catch(e) {}
-  };
 
   const handleAmountOrDateChange = (field: string, value: string) => {
     let nextDue = formAmountDue;
@@ -287,36 +372,57 @@ export default function PaymentsPage() {
     }
   };
 
-  const handleSavePayment = () => {
+  const handleSavePayment = async () => {
     if (!formOR || !formAmountDue || !formAmountPaid || !formDate || !formDeceased) {
       alert("Please fill all required fields.");
       return;
     }
     const due = parseFloat(formAmountDue);
     const paid = parseFloat(formAmountPaid);
-    const today = new Date().toISOString().split('T')[0] ?? '';
-    const newPayment: PaymentRecord = {
-      id: Date.now().toString(),
-      ref: `PAY-${Math.floor(1000 + Math.random() * 9000)}`,
-      payorName: formPayor || 'Guest Payor',
-      deceasedName: formDeceased,
-      orNo: formOR,
-      amountDue: due,
-      amountPaid: paid,
-      datePaid: formDate,
-      method: formMethod,
-      yearCovered: formYear,
-      dueDate: formDueDate,
-      remarks: formRemarks,
-      status: paid >= due ? 'paid' : (formDueDate && formDueDate < today) ? 'overdue' : paid > 0 ? 'overdue' : 'pending'
-    };
-    const updatedPayments = [newPayment, ...payments];
-    setPayments(updatedPayments);
-    localStorage.setItem('cemeteryPayments', JSON.stringify(updatedPayments));
-    syncInventoryBalance(newPayment.deceasedName, updatedPayments);
-    setAuditLogs([{ ts: new Date().toISOString(), user: 'Admin Jasaan', action: `Recorded payment ${newPayment.orNo} for ${newPayment.deceasedName}` }, ...auditLogs]);
-    setShowPaymentModal(false);
-    setFormOR(''); setFormAmountDue(''); setFormAmountPaid(''); setFormDeceased(''); setFormYear(''); setFormRemarks(''); setFormPayor(''); setFormDueDate('');
+    
+    setIsSubmitting(true);
+    try {
+      // Find matching deceased record from DB if any
+      const matchingDeceased = deceasedList.find(
+        d => d.id === formDeceasedId || (d.NAME_OF_DECEASED || '').toLowerCase() === formDeceased.toLowerCase()
+      );
+
+      // Create a dedicated record in payment_records table in Supabase
+      const res = await addPaymentRecord({
+        PAYORS_NAME: formPayor || (matchingDeceased?.PAYORS_NAME) || 'Guest Payor',
+        CONTACT_NO: matchingDeceased?.CONTACT_NO || 'N/A',
+        NAME_OF_DECEASED: formDeceased,
+        ADDRESS: matchingDeceased?.ADDRESS || 'Jasaan, Misamis Oriental',
+        DATE_OF_BIRTH: matchingDeceased?.DATE_OF_BIRTH ? new Date(matchingDeceased.DATE_OF_BIRTH).toISOString().split('T')[0] : undefined,
+        DATE_OF_DEATH: matchingDeceased?.DATE_OF_DEATH ? new Date(matchingDeceased.DATE_OF_DEATH).toISOString().split('T')[0] : formDate,
+        YEAR: parseInt(formYear) || new Date().getFullYear(),
+        TOTAL_DUE: due,
+        PAID: paid,
+        OR_NO: formOR,
+        DATE_PAID: formDate,
+        METHOD: formMethod || 'Cash',
+        DUE_DATE: formDueDate || undefined,
+        REMARKS: formRemarks ? `OR #${formOR}: ₱${paid} (${formRemarks})` : `OR #${formOR}: ₱${paid}`,
+        deceasedRecordId: matchingDeceased?.id || formDeceasedId || undefined,
+      });
+
+      if (!res.success) {
+        alert("Error saving payment to database: " + res.error);
+        setIsSubmitting(false);
+        return;
+      }
+
+      setAuditLogs(prev => [{ ts: new Date().toISOString(), user: 'Admin Jasaan', action: `Recorded payment OR #${formOR} (₱${paid}) for ${formDeceased}` }, ...prev]);
+      setShowPaymentModal(false);
+      setFormOR(''); setFormAmountDue(''); setFormAmountPaid(''); setFormDeceased(''); setFormDeceasedId(''); setFormYear(''); setFormRemarks(''); setFormPayor(''); setFormDueDate('');
+      
+      // Reload fresh data directly from Supabase payment_records table
+      await loadData();
+    } catch (err: any) {
+      alert("Failed to save payment: " + err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const viewReceipt = (p: PaymentRecord) => {
@@ -332,7 +438,7 @@ export default function PaymentsPage() {
     setShowUpdateModal(true);
   };
 
-  const handleUpdatePayment = () => {
+  const handleUpdatePayment = async () => {
     if (!currentUpdateRecord) return;
     let newDue = parseFloat(editAmountDue);
     let newPaid = parseFloat(editAmountPaid);
@@ -342,24 +448,31 @@ export default function PaymentsPage() {
       const addedAmount = parseFloat(addAmountPaid);
       if (!isNaN(addedAmount) && addedAmount > 0) newPaid += addedAmount;
     }
-    const today = new Date().toISOString().split('T')[0] ?? '';
-    const updatedPayments = payments.map(p => {
-      if (p.id === currentUpdateRecord.id) {
-        return {
-          ...p,
-          amountDue: newDue,
-          amountPaid: newPaid,
-          status: newPaid >= newDue ? 'paid' : (p.dueDate && p.dueDate < today) ? 'overdue' : newPaid > 0 ? 'overdue' : 'pending'
-        };
+
+    setIsSubmitting(true);
+    try {
+      const res = await updatePaymentRecord(currentUpdateRecord.id, {
+        TOTAL_DUE: newDue,
+        PAID: newPaid,
+      });
+
+      if (!res.success) {
+        alert("Error updating record in database: " + res.error);
+        setIsSubmitting(false);
+        return;
       }
-      return p;
-    });
-    setPayments(updatedPayments);
-    localStorage.setItem('cemeteryPayments', JSON.stringify(updatedPayments));
-    syncInventoryBalance(currentUpdateRecord.deceasedName, updatedPayments);
-    setAuditLogs([{ ts: new Date().toISOString(), user: 'Admin Jasaan', action: `Managed balance for ${currentUpdateRecord.deceasedName} (Due: ₱${newDue}, Paid: ₱${newPaid})` }, ...auditLogs]);
-    setShowUpdateModal(false);
-    setCurrentUpdateRecord(null);
+
+      setAuditLogs(prev => [{ ts: new Date().toISOString(), user: 'Admin Jasaan', action: `Updated balance for ${currentUpdateRecord.deceasedName} (Due: ₱${newDue}, Paid: ₱${newPaid}) in database` }, ...prev]);
+      setShowUpdateModal(false);
+      setCurrentUpdateRecord(null);
+
+      // Reload fresh data from Supabase
+      await loadData();
+    } catch (err: any) {
+      alert("Failed to update payment: " + err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const openDeleteModal = (record: PaymentRecord) => {
@@ -367,36 +480,39 @@ export default function PaymentsPage() {
     setShowDeleteModal(true);
   };
 
-  const confirmDeletePayment = () => {
+  const confirmDeletePayment = async () => {
     if (!recordToDelete) return;
     const target = recordToDelete;
 
-    let deletedIds: string[] = [];
+    setIsSubmitting(true);
     try {
-      deletedIds = JSON.parse(localStorage.getItem('deletedPaymentIds') || '[]');
-    } catch (e) {}
-    if (!deletedIds.includes(target.id)) deletedIds.push(target.id);
-    if (target.ref && !deletedIds.includes(target.ref)) deletedIds.push(target.ref);
-    localStorage.setItem('deletedPaymentIds', JSON.stringify(deletedIds));
+      const res = await archivePaymentRecord(target.id, "Archived from payment records");
+      if (!res.success) {
+        alert("Error archiving record in database: " + res.error);
+        setIsSubmitting(false);
+        return;
+      }
 
-    const updated = payments.filter(p => p.id !== target.id && p.ref !== target.ref);
-    setPayments(updated);
-    setFilteredPayments(prev => prev.filter(p => p.id !== target.id && p.ref !== target.ref));
-    localStorage.setItem('cemeteryPayments', JSON.stringify(updated));
+      setAuditLogs(prev => [
+        {
+          ts: new Date().toISOString(),
+          user: 'Admin Jasaan',
+          action: `Archived payment record ${target.ref} (${target.payorName} / ${target.deceasedName}) in database`
+        },
+        ...prev
+      ]);
 
-    // Add to Audit Log
-    setAuditLogs(prev => [
-      {
-        ts: new Date().toISOString(),
-        user: 'Admin Jasaan',
-        action: `Deleted payment record ${target.ref} (${target.payorName} / ${target.deceasedName})`
-      },
-      ...prev
-    ]);
+      setShowDeleteModal(false);
+      setShowUpdateModal(false);
+      setRecordToDelete(null);
 
-    setShowDeleteModal(false);
-    setShowUpdateModal(false);
-    setRecordToDelete(null);
+      // Refresh live database data
+      await loadData();
+    } catch (err: any) {
+      alert("Failed to archive record: " + err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleGenerateReport = () => {
@@ -409,8 +525,36 @@ export default function PaymentsPage() {
     let recordsToExport = uniqueResult;
     if (generateYear !== 'all') recordsToExport = uniqueResult.filter(p => p.yearCovered === generateYear);
     if (recordsToExport.length === 0) { alert("No records found for the selected year."); return; }
-    const headers = ['Ref No', 'Payor Name', 'Deceased Name', 'Year', 'Date Paid', 'OR No', 'Method', 'Amount Due', 'Amount Paid', 'Balance', 'Status'];
-    const rows = recordsToExport.map(p => [p.ref, `"${p.payorName}"`, `"${p.deceasedName}"`, p.yearCovered, p.datePaid, p.orNo, p.method, p.amountDue, p.amountPaid, Math.max(0, p.amountDue - p.amountPaid), p.status.toUpperCase()]);
+    const headers = [
+      'REF. NO.',
+      "PAYOR'S NAME",
+      'CONTACT NO.',
+      'NAME OF DECEASED',
+      'ADDRESS',
+      'DATE OF BIRTH',
+      'DATE OF DEATH',
+      'YEAR',
+      'TOTAL DUE',
+      'PAID',
+      'BALANCE',
+      'STATUS',
+      'REMARKS'
+    ];
+    const rows = recordsToExport.map(p => [
+      p.ref,
+      `"${p.payorName}"`,
+      `"${p.contactNo || '—'}"`,
+      `"${p.deceasedName}"`,
+      `"${p.address || '—'}"`,
+      p.birthDate || '—',
+      p.deathDate || '—',
+      p.yearCovered,
+      p.amountDue,
+      p.amountPaid,
+      Math.max(0, p.amountDue - p.amountPaid),
+      p.status.toUpperCase(),
+      `"${p.remarks || '—'}"`
+    ]);
     const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
@@ -442,13 +586,13 @@ export default function PaymentsPage() {
         <div className={`${styles.statCard} ${styles.statGreen}`}><div className={styles.statLabel}>Fully Paid</div><div className={styles.statValue}>{countPaid}</div><div className={styles.statSub}>Completed</div></div>
         <div className={`${styles.statCard} ${styles.statOrange}`}><div className={styles.statLabel}>Overdue</div><div className={styles.statValue}>{countOverdue}</div><div className={styles.statSub}>Balance remaining</div></div>
         <div className={`${styles.statCard} ${styles.statRed}`}><div className={styles.statLabel}>Pending</div><div className={styles.statValue}>{countPending}</div><div className={styles.statSub}>Awaiting payment</div></div>
-        <div className={`${styles.statCard} ${styles.statBlue}`}><div className={styles.statLabel}>Total Collected</div><div className={styles.statValue}>₱{totalCollected}</div><div className={styles.statSub}>All transactions</div></div>
+        <div className={`${styles.statCard} ${styles.statBlue}`}><div className={styles.statLabel}>Total Collected</div><div className={styles.statValue}>₱{fmtCurrency(totalCollected)}</div><div className={styles.statSub}>All transactions</div></div>
       </div>
 
       <div className={styles.filterBar}>
         <div className={styles.filterGroup} style={{ flex: 2 }}>
           <label>Search</label>
-          <input type="text" className={styles.filterInput} placeholder="Payor, deceased, OR number, ref..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+          <input type="text" className={styles.filterInput} placeholder="Payor, deceased, contact, address, ref..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
         </div>
         <div className={styles.filterGroup}>
           <label>Status</label>
@@ -480,55 +624,93 @@ export default function PaymentsPage() {
 
       <div className={styles.panel}>
         <div className={styles.panelHead}>
-          <div><h4>Payment Transaction Log</h4><p>Showing {filteredPayments.length} records</p></div>
+          <div><h4>Payment Records Log</h4><p>Showing {filteredPayments.length} records in database</p></div>
         </div>
         <div className={styles.tblWrapper}>
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>REF. NO.</th><th>PAYOR&apos;S NAME</th><th>DECEASED</th><th>YEAR</th><th>DATE PAID</th><th>OR NO.</th>
-                <th>METHOD</th><th>DUE DATE</th><th>PAID</th><th>BALANCE</th><th>STATUS</th><th>ACTIONS</th>
+                <th>REF. NO.</th>
+                <th>PAYOR&apos;S NAME</th>
+                <th>CONTACT NO.</th>
+                <th>NAME OF DECEASED</th>
+                <th>ADDRESS</th>
+                <th>DATE OF BIRTH</th>
+                <th>DATE OF DEATH</th>
+                <th>YEAR</th>
+                <th>TOTAL DUE</th>
+                <th>PAID</th>
+                <th>BALANCE</th>
+                <th>STATUS</th>
+                <th>REMARKS</th>
+                <th>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
-              {pageItems.length === 0 ? (
-                <tr><td colSpan={12} style={{ textAlign: 'center', padding: '30px' }}>No payment records found.</td></tr>
-              ) : pageItems.map(p => (
-                <tr key={p.id}>
-                  <td><span className={styles.refBadge}>{p.ref}</span></td>
-                  <td><strong>{p.payorName}</strong></td>
-                  <td>{p.deceasedName}</td>
-                  <td>{p.yearCovered}</td>
-                  <td>{p.datePaid || '—'}</td>
-                  <td><span style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{p.orNo || '—'}</span></td>
-                  <td>{p.method || '—'}</td>
-                  <td>{p.dueDate || '—'}</td>
-                  <td style={{ color: p.amountPaid >= p.amountDue ? '#a5d6a7' : '#ffb74d', fontWeight: '600' }}>₱{p.amountPaid.toLocaleString()}</td>
-                  <td style={{ fontWeight: '600' }}>₱{Math.max(0, p.amountDue - p.amountPaid).toLocaleString()}</td>
-                  <td>{getStatusBadge(p.status)}</td>
-                  <td>
-                    <div className={styles.actionGroup}>
-                      {p.status !== 'pending' && <button className={styles.actionBtn} style={{ display: 'flex', alignItems: 'center' }} onClick={() => viewReceipt(p)}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'4px'}}><path d="M4 2v20l2-2 2 2 2-2 2 2 2-2 2 2 2-2 2 2V2l-2 2-2-2-2 2-2-2-2 2-2-2-2 2Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17V7"/></svg> Receipt
-                      </button>}
-                      <button className={styles.actionBtn} style={{ color: '#ffb74d', display: 'flex', alignItems: 'center' }} onClick={() => openUpdatePayment(p)}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'4px'}}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg> Manage Balance
-                      </button>
-                      <button
-                        className={`${styles.actionBtn} ${styles.btnDeleteAction}`}
-                        style={{ display: 'flex', alignItems: 'center' }}
-                        onClick={() => openDeleteModal(p)}
-                        title="Delete Payment Record"
-                      >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'3px'}}>
-                          <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
-                        </svg>
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {loading ? (
+                <tr><td colSpan={14} style={{ textAlign: 'center', padding: '30px' }}>Loading payment records from database...</td></tr>
+              ) : pageItems.length === 0 ? (
+                <tr><td colSpan={14} style={{ textAlign: 'center', padding: '30px' }}>No payment records found.</td></tr>
+              ) : pageItems.map(p => {
+                const bal = Math.max(0, p.amountDue - p.amountPaid);
+                const isCleared = p.amountDue > 0 && p.amountPaid >= p.amountDue;
+                return (
+                  <tr key={p.id}>
+                    <td><span className={styles.refBadge}>{p.ref}</span></td>
+                    <td><strong>{p.payorName}</strong></td>
+                    <td>{p.contactNo || '—'}</td>
+                    <td>{p.deceasedName}</td>
+                    <td title={p.address}>{p.address || '—'}</td>
+                    <td>{p.birthDate || '—'}</td>
+                    <td>{p.deathDate || '—'}</td>
+                    <td>{p.yearCovered}</td>
+                    <td style={{ color: '#7A7570', fontWeight: '500' }}>₱{fmtCurrency(p.amountDue)}</td>
+                    <td style={{ color: isCleared ? '#a5d6a7' : '#ffb74d', fontWeight: '600' }}>
+                      ₱{fmtCurrency(p.amountPaid)}
+                    </td>
+                    <td style={{ fontWeight: '600' }}>
+                      {isCleared ? (
+                        <span style={{ color: '#a5d6a7', fontSize: '0.75rem', fontWeight: 'bold' }}>CLEARED</span>
+                      ) : (
+                        `₱${fmtCurrency(bal)}`
+                      )}
+                    </td>
+                    <td>{getStatusBadge(p.status)}</td>
+                    <td title={p.remarks}>{p.remarks || '—'}</td>
+                    <td>
+                      <div className={styles.actionGroup}>
+                        {p.status !== 'pending' && (
+                          <button className={styles.actionBtn} style={{ display: 'flex', alignItems: 'center' }} onClick={() => viewReceipt(p)}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'4px'}}><path d="M4 2v20l2-2 2 2 2-2 2 2 2-2 2 2 2-2 2 2V2l-2 2-2-2-2 2-2-2-2 2-2-2-2 2Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17V7"/></svg> Receipt
+                          </button>
+                        )}
+                        <button className={styles.actionBtn} style={{ color: '#ffb74d', display: 'flex', alignItems: 'center' }} onClick={() => openUpdatePayment(p)}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'4px'}}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg> Manage Balance
+                        </button>
+                        <button
+                          className={styles.actionBtn}
+                          style={{ color: '#E2C97E', display: 'flex', alignItems: 'center' }}
+                          onClick={() => openSmsReminderModal(p)}
+                          title="Send SMS Payment Reminder via Semaphore"
+                        >
+                          <span style={{ marginRight: '4px' }}>💬</span> SMS Reminder
+                        </button>
+                        <button
+                          className={`${styles.actionBtn} ${styles.btnDeleteAction}`}
+                          style={{ display: 'flex', alignItems: 'center' }}
+                          onClick={() => openDeleteModal(p)}
+                          title="Delete Payment Record"
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'3px'}}>
+                            <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                          </svg>
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -581,8 +763,9 @@ export default function PaymentsPage() {
                             onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
                             onClick={() => {
                               const balStr = bal > 0 ? bal.toString() : '';
+                              setFormDeceasedId(s.id);
                               setFormDeceased(s.deceasedName);
-                              setFormAmountDue(balStr);
+                              setFormAmountDue(balStr || (s.amountDue ? s.amountDue.toString() : ''));
                               setFormYear(s.yearCovered);
                               setFormPayor(s.payorName);
                               setShowSuggestions(false);
@@ -654,8 +837,10 @@ export default function PaymentsPage() {
               </div>
             </div>
             <div className={styles.modalFooter}>
-              <button className={styles.btnOutline} onClick={() => setShowPaymentModal(false)}>Cancel</button>
-              <button className={styles.btnGold} onClick={handleSavePayment}>SAVE PAYMENT</button>
+              <button className={styles.btnOutline} disabled={isSubmitting} onClick={() => setShowPaymentModal(false)}>Cancel</button>
+              <button className={styles.btnGold} disabled={isSubmitting} onClick={handleSavePayment}>
+                {isSubmitting ? 'SAVING...' : 'SAVE PAYMENT'}
+              </button>
             </div>
           </div>
         </div>
@@ -808,6 +993,7 @@ export default function PaymentsPage() {
                 type="button"
                 className={styles.btnDanger}
                 style={{ marginRight: 'auto' }}
+                disabled={isSubmitting}
                 onClick={() => {
                   setShowUpdateModal(false);
                   if (currentUpdateRecord) openDeleteModal(currentUpdateRecord);
@@ -815,8 +1001,10 @@ export default function PaymentsPage() {
               >
                 🗑 Delete Record
               </button>
-              <button className={styles.btnOutline} onClick={() => setShowUpdateModal(false)}>Cancel</button>
-              <button className={styles.btnGold} onClick={handleUpdatePayment}>SAVE CHANGES</button>
+              <button className={styles.btnOutline} disabled={isSubmitting} onClick={() => setShowUpdateModal(false)}>Cancel</button>
+              <button className={styles.btnGold} disabled={isSubmitting} onClick={handleUpdatePayment}>
+                {isSubmitting ? 'SAVING...' : 'SAVE CHANGES'}
+              </button>
             </div>
           </div>
         </div>
@@ -824,7 +1012,7 @@ export default function PaymentsPage() {
 
       {/* Delete Payment Confirmation Modal */}
       {showDeleteModal && recordToDelete && (
-        <div className={styles.modalOverlay} onClick={e => { if (e.target === e.currentTarget) setShowDeleteModal(false); }}>
+        <div className={styles.modalOverlay} onClick={e => { if (e.target === e.currentTarget && !isSubmitting) setShowDeleteModal(false); }}>
           <div className={styles.modalContent} style={{ maxWidth: '440px' }}>
             <div className={styles.modalHeader}>
               <h3 style={{ color: '#ef5350', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -834,7 +1022,7 @@ export default function PaymentsPage() {
                 </svg>
                 Delete Payment Record
               </h3>
-              <span className={styles.modalClose} onClick={() => setShowDeleteModal(false)}>&times;</span>
+              <span className={styles.modalClose} onClick={() => !isSubmitting && setShowDeleteModal(false)}>&times;</span>
             </div>
             <div className={styles.modalBody}>
               <p style={{ color: 'var(--admin-text-main)', fontSize: '0.95rem', marginBottom: '14px', lineHeight: 1.5 }}>
@@ -852,9 +1040,52 @@ export default function PaymentsPage() {
               </p>
             </div>
             <div className={styles.modalFooter}>
-              <button className={styles.btnOutline} onClick={() => setShowDeleteModal(false)}>Cancel</button>
-              <button className={styles.btnDanger} onClick={confirmDeletePayment}>
-                🗑 Delete Record
+              <button className={styles.btnOutline} disabled={isSubmitting} onClick={() => setShowDeleteModal(false)}>Cancel</button>
+              <button className={styles.btnDanger} disabled={isSubmitting} onClick={confirmDeletePayment}>
+                {isSubmitting ? 'DELETING...' : '🗑 Delete Record'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SMS Payment Reminder Modal */}
+      {showSmsReminderModal && smsTargetPayment && (
+        <div className={styles.modalOverlay} onClick={e => { if (e.target === e.currentTarget && !isSendingSmsReminder) setShowSmsReminderModal(false); }}>
+          <div className={styles.modalContent} style={{ maxWidth: '520px' }}>
+            <div className={styles.modalHeader}>
+              <h3 style={{ color: '#E2C97E', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>💬</span> Send SMS Payment Reminder
+              </h3>
+              <span className={styles.modalClose} onClick={() => !isSendingSmsReminder && setShowSmsReminderModal(false)}>&times;</span>
+            </div>
+            <div className={styles.modalBody}>
+              <p style={{ color: 'var(--admin-text-main)', fontSize: '0.88rem', marginBottom: '14px' }}>
+                Review and customize the payment reminder SMS before dispatching via Semaphore:
+              </p>
+              <div style={{ padding: '12px 14px', backgroundColor: 'var(--admin-input-bg)', border: '1px solid var(--admin-input-border)', borderRadius: '8px', fontSize: '0.83rem', lineHeight: '1.6', marginBottom: '14px' }}>
+                <div><strong style={{ color: 'var(--admin-text-muted)' }}>Recipient Payor:</strong> <span style={{ color: '#E2C97E' }}>{smsTargetPayment.payorName}</span></div>
+                <div><strong style={{ color: 'var(--admin-text-muted)' }}>Contact Number:</strong> <code>{smsTargetPayment.contactNo}</code></div>
+                <div><strong style={{ color: 'var(--admin-text-muted)' }}>Deceased:</strong> {smsTargetPayment.deceasedName}</div>
+                <div><strong style={{ color: 'var(--admin-text-muted)' }}>Outstanding Balance:</strong> <strong style={{ color: '#ffb74d' }}>₱{smsTargetPayment.balance.toLocaleString()}</strong></div>
+              </div>
+
+              <div style={{ marginBottom: '6px', fontSize: '0.75rem', fontWeight: 600, color: '#C8A84B', textTransform: 'uppercase' }}>
+                Message Body
+              </div>
+              <textarea
+                style={{ width: '100%', minHeight: '100px', backgroundColor: 'var(--admin-input-bg)', border: '1px solid var(--admin-input-border)', borderRadius: '8px', padding: '10px 12px', color: 'var(--admin-text-main)', fontSize: '0.85rem', outline: 'none', lineHeight: 1.5, resize: 'vertical' }}
+                value={smsReminderText}
+                onChange={e => setSmsReminderText(e.target.value)}
+              />
+              <div style={{ fontSize: '0.7rem', color: '#7A7570', textAlign: 'right', marginTop: '4px' }}>
+                {smsReminderText.length} characters
+              </div>
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.btnOutline} disabled={isSendingSmsReminder} onClick={() => setShowSmsReminderModal(false)}>Cancel</button>
+              <button className={styles.btnGold} disabled={isSendingSmsReminder || !smsReminderText.trim()} onClick={handleSendSmsReminder}>
+                {isSendingSmsReminder ? 'Sending SMS...' : 'Confirm & Send SMS'}
               </button>
             </div>
           </div>

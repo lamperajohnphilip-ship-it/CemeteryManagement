@@ -784,3 +784,302 @@
     color: #7A7570;
     font-size: 0.73rem;
 }
+
+/* Tabs Navigation */
+.tabNav {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--admin-border);
+    padding-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.tabBtn {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 9px 18px;
+    color: var(--admin-text-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.tabBtn:hover {
+    color: #E2C97E;
+    background: rgba(200, 168, 75, 0.05);
+}
+
+.tabBtnActive {
+    background: rgba(200, 168, 75, 0.12);
+    border-color: rgba(200, 168, 75, 0.35);
+    color: #E2C97E;
+    font-weight: 600;
+}
+
+.tabBadge {
+    background: rgba(200, 168, 75, 0.2);
+    color: #E2C97E;
+    padding: 2px 7px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+/* Composer Form Layout */
+.composerGrid {
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 24px;
+}
+
+@media (max-width: 992px) {
+    .composerGrid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.formCard {
+    background: var(--admin-panel-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: 14px;
+    padding: 24px;
+}
+
+.formCardTitle {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.35rem;
+    color: #E2C97E;
+    margin-bottom: 6px;
+}
+
+.formCardSub {
+    font-size: 0.8rem;
+    color: #7A7570;
+    margin-bottom: 20px;
+}
+
+.formRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+@media (max-width: 600px) {
+    .formRow {
+        grid-template-columns: 1fr;
+    }
+}
+
+.formGroup {
+    margin-bottom: 18px;
+    display: flex;
+    flex-direction: column;
+}
+
+.formLabel {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #C8A84B;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.formInput,
+.formSelect {
+    background: var(--admin-input-bg);
+    border: 1px solid var(--admin-input-border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--admin-text-main);
+    font-size: 0.85rem;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    width: 100%;
+}
+
+.formInput:focus,
+.formSelect:focus {
+    border-color: #C8A84B;
+    box-shadow: 0 0 0 2px rgba(200, 168, 75, 0.15);
+}
+
+.inputHint {
+    font-size: 0.7rem;
+    color: #7A7570;
+    margin-top: 4px;
+}
+
+.counterRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 6px;
+    font-size: 0.72rem;
+    color: #7A7570;
+}
+
+.segmentBadge {
+    background: rgba(200, 168, 75, 0.12);
+    color: #E2C97E;
+    border: 1px solid rgba(200, 168, 75, 0.25);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.68rem;
+}
+
+/* Sender Info Box */
+.senderBox {
+    background: rgba(200, 168, 75, 0.05);
+    border: 1px solid rgba(200, 168, 75, 0.18);
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    font-size: 0.78rem;
+}
+
+.senderBoxLabel {
+    color: #7A7570;
+}
+
+.senderBoxValue {
+    color: #E2C97E;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+}
+
+/* Buttons in Composer */
+.formActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 18px;
+    border-top: 1px solid var(--admin-border);
+}
+
+/* Status Badges in History */
+.statusSent, .statusDelivered {
+    background: rgba(90, 158, 111, 0.15);
+    color: #6fbf8c;
+    border: 1px solid rgba(90, 158, 111, 0.3);
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.statusQueued, .statusPending {
+    background: rgba(200, 132, 58, 0.15);
+    color: #e6b064;
+    border: 1px solid rgba(200, 132, 58, 0.3);
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.statusFailed {
+    background: rgba(211, 47, 47, 0.15);
+    color: #ef9a9a;
+    border: 1px solid rgba(211, 47, 47, 0.35);
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.statusRefunded {
+    background: rgba(142, 68, 173, 0.15);
+    color: #d7bde2;
+    border: 1px solid rgba(142, 68, 173, 0.35);
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+/* Alert Notification Banner */
+.alertBanner {
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 0.82rem;
+    animation: fadeIn 0.3s ease;
+}
+
+.alertSuccess {
+    background: rgba(46, 125, 50, 0.15);
+    border: 1px solid rgba(76, 175, 80, 0.35);
+    color: #a5d6a7;
+}
+
+.alertError {
+    background: rgba(211, 47, 47, 0.15);
+    border: 1px solid rgba(244, 67, 54, 0.35);
+    color: #ef9a9a;
+}
+
+.alertWarning {
+    background: rgba(237, 108, 2, 0.15);
+    border: 1px solid rgba(255, 152, 0, 0.35);
+    color: #ffb74d;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.phonePreviewFrame {
+    background: #14120F;
+    border: 2px solid #2B261F;
+    border-radius: 24px;
+    padding: 18px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+    position: relative;
+}
+
+.phoneTopNotch {
+    width: 60px;
+    height: 4px;
+    background: #3A342A;
+    border-radius: 4px;
+    margin: 0 auto 16px;
+}
+
+.phoneHeader {
+    text-align: center;
+    border-bottom: 1px solid #2B261F;
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+}
+
+.phoneHeaderName {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #F5EEDC;
+}
+
+.phoneHeaderPhone {
+    font-size: 0.7rem;
+    color: #7A7570;
+}

@@ -3,6 +3,7 @@
 import { prisma } from '../../lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { sendInquiryAcceptanceEmail, sendInquiryReceivedEmail } from '../../lib/email';
+import { sendSmsNotification } from './sms';
 
 export async function submitInquiry(data: {
   APP_ID: string;
@@ -97,10 +98,11 @@ export async function getInquiries() {
 /**
  * Accepts/approves an inquiry:
  * 1. Validates the inquiry exists.
- * 2. Prevents duplicate emails if already accepted.
+ * 2. Prevents duplicate emails/SMS if already accepted.
  * 3. Updates database status to 'Accepted'.
  * 4. Automatically sends acceptance email to user's stored email.
- * 5. Returns status and message to the Admin UI.
+ * 5. Automatically sends acceptance SMS to user's contact number.
+ * 6. Returns status and message to the Admin UI.
  */
 export async function acceptInquiry(id: number, remarks?: string) {
   try {
@@ -113,11 +115,14 @@ export async function acceptInquiry(id: number, remarks?: string) {
       return { success: false, message: 'Inquiry not found.' };
     }
 
-    // 2. Prevent accidental duplicate actions & duplicate emails
+    // 2. Prevent accidental duplicate actions & duplicate notifications
     if (existing.STATUS.toLowerCase() === 'accepted' || existing.STATUS.toLowerCase() === 'confirmed') {
       return {
         success: false,
         alreadyAccepted: true,
+        emailSent: false,
+        smsSent: false,
+        emailError: undefined as string | undefined,
         message: `Inquiry ${existing.APP_ID} has already been accepted.`,
         record: existing,
       };
@@ -132,19 +137,19 @@ export async function acceptInquiry(id: number, remarks?: string) {
       },
     });
 
+    const formattedDate = existing.BURIAL_DATE
+      ? new Date(existing.BURIAL_DATE).toLocaleDateString('en-PH', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })
+      : null;
+
     // 4. Send acceptance email to the user's Gmail/email address
     let emailSent = false;
     let emailError: string | undefined;
 
     if (existing.email && existing.email.trim()) {
-      const formattedDate = existing.BURIAL_DATE
-        ? new Date(existing.BURIAL_DATE).toLocaleDateString('en-PH', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          })
-        : null;
-
       const emailResult = await sendInquiryAcceptanceEmail({
         appId: existing.APP_ID,
         recipientName: existing.FAMILY_NAME,
@@ -165,45 +170,88 @@ export async function acceptInquiry(id: number, remarks?: string) {
       emailError = 'No email address found for this inquiry record.';
     }
 
-    revalidatePath('/admin/inquiries');
+    // 5. Send automated SMS Notification to citizen's contact number
+    let smsSent = false;
+    let smsError: string | undefined;
 
-    if (emailSent) {
-      return {
-        success: true,
-        emailSent: true,
-        record: updatedRecord,
-        message: `Inquiry accepted successfully. An acceptance email has been sent to ${existing.email}.`,
-      };
-    } else {
-      return {
-        success: true,
-        emailSent: false,
-        emailError,
-        record: updatedRecord,
-        message: `Inquiry accepted successfully in database, but email notification could not be sent (${emailError}).`,
-      };
+    if (existing.CONTACT && existing.CONTACT.trim()) {
+      const dateSnippet = formattedDate ? ` on ${formattedDate}${existing.TIME ? ' at ' + existing.TIME : ''}` : '';
+      const smsMessage = `Good day ${existing.FAMILY_NAME}, your cemetery inquiry (Ref: ${existing.APP_ID}) has been APPROVED by the Municipality of Jasaan Cemetery Management Office. Please visit the office${dateSnippet}. Thank you.`;
+
+      try {
+        const smsResult = await sendSmsNotification({
+          recipient: existing.CONTACT.trim(),
+          recipientName: existing.FAMILY_NAME,
+          message: smsMessage,
+          type: 'INQUIRY_APPROVED',
+          sentBy: 'System Automation',
+        });
+        smsSent = smsResult.success;
+        if (!smsResult.success) smsError = smsResult.error;
+      } catch (smsErr: any) {
+        console.warn('Inquiry acceptance SMS failed:', smsErr);
+        smsError = smsErr?.message;
+      }
     }
+
+    revalidatePath('/admin/inquiries');
+    revalidatePath('/admin/sms');
+
+    const notifSummary = [];
+    if (emailSent) notifSummary.push(`Email sent to ${existing.email}`);
+    if (smsSent) notifSummary.push(`SMS sent to ${existing.CONTACT}`);
+
+    return {
+      success: true,
+      emailSent,
+      smsSent,
+      emailError: emailError || undefined,
+      smsError: smsError || undefined,
+      record: updatedRecord,
+      message: `Inquiry accepted successfully. ${notifSummary.length > 0 ? `(${notifSummary.join(', ')})` : ''}`,
+    };
   } catch (error: any) {
     console.error("Failed to accept inquiry:", error);
-    return { success: false, message: error.message || 'Failed to accept inquiry' };
+    return { success: false, emailSent: false, smsSent: false, emailError: error.message, message: error.message || 'Failed to accept inquiry' };
   }
 }
 
 export async function updateInquiryStatus(id: number, status: string, remarks?: string) {
   try {
-    // If status is being updated to Accepted, route through acceptInquiry for email handling
+    // If status is being updated to Accepted, route through acceptInquiry for email & SMS handling
     if (status.toLowerCase() === 'accepted' || status.toLowerCase() === 'confirmed') {
       return await acceptInquiry(id, remarks);
     }
+
+    const existing = await prisma.inquiries.findUnique({ where: { id } });
 
     const record = await prisma.inquiries.update({
       where: { id },
       data: { STATUS: status, remarks }
     });
+
+    // If status is Rejected, notify citizen via SMS
+    if (status.toLowerCase() === 'rejected' && existing?.CONTACT) {
+      const rejectSms = `Good day ${existing.FAMILY_NAME}, regarding your cemetery inquiry (${existing.APP_ID}): your request was not approved. Please contact the Jasaan Cemetery Office for assistance.`;
+      try {
+        await sendSmsNotification({
+          recipient: existing.CONTACT,
+          recipientName: existing.FAMILY_NAME,
+          message: rejectSms,
+          type: 'INQUIRY_REJECTED',
+          sentBy: 'System Automation',
+        });
+      } catch (smsErr) {
+        console.warn('Inquiry rejection SMS warning:', smsErr);
+      }
+    }
+
     revalidatePath('/admin/inquiries');
+    revalidatePath('/admin/sms');
     return { success: true, record, message: `Status updated to ${status}` };
   } catch (error: any) {
     console.error("Failed to update inquiry:", error);
     return { success: false, message: error.message || 'Failed to update inquiry' };
   }
 }
+

@@ -1,47 +1,443 @@
 'use server';
 
-export async function sendSmsNotification(phone: string, message: string) {
+import { prisma } from '../../lib/prisma';
+import { revalidatePath } from 'next/cache';
+
+/**
+ * SMS Notification Service — Powered by Semaphore (Philippines)
+ * 
+ * Semaphore routes directly through Philippine telcos:
+ * Globe, Smart, DITO, TNT, TM.
+ * 
+ * API endpoint: POST https://api.semaphore.co/api/v4/messages
+ * Parameters: apikey, number, message, sendername (optional)
+ */
+
+/**
+ * Normalizes Philippine mobile numbers to Semaphore's standard format (09XXXXXXXXX).
+ * Accepts:
+ *   '09171234567'      -> '09171234567'
+ *   '+639171234567'    -> '09171234567'
+ *   '639171234567'     -> '09171234567'
+ *   '9171234567'       -> '09171234567'
+ */
+export function normalizePhilippineNumber(phone: string): string {
+  if (!phone) return '';
+  const cleaned = phone.replace(/[\s\-\(\)\.]/g, '').trim();
+
+  if (cleaned.startsWith('+63')) {
+    return '0' + cleaned.substring(3);
+  }
+  if (cleaned.startsWith('63') && cleaned.length === 12) {
+    return '0' + cleaned.substring(2);
+  }
+  if (cleaned.startsWith('9') && cleaned.length === 10) {
+    return '0' + cleaned;
+  }
+  return cleaned;
+}
+
+/**
+ * Validates whether a phone number is a valid 11-digit Philippine mobile number starting with 09.
+ */
+export function isValidPhilippineNumber(phone: string): boolean {
+  const normalized = normalizePhilippineNumber(phone);
+  return /^09\d{9}$/.test(normalized);
+}
+
+/**
+ * Calculates character count and GSM SMS segments.
+ * 1 segment  = up to 160 characters (GSM 7-bit standard)
+ * Multi-part = 153 characters per segment due to UDH header
+ */
+export function calculateSmsSegments(message: string): { chars: number; segments: number; maxChars: number } {
+  const chars = (message || '').length;
+  if (chars <= 160) {
+    return { chars, segments: chars > 0 ? 1 : 0, maxChars: 160 };
+  }
+  const segments = Math.ceil(chars / 153);
+  return { chars, segments, maxChars: segments * 153 };
+}
+
+export interface SendSmsParams {
+  recipient: string;
+  recipientName?: string;
+  message: string;
+  type?: string;
+  sentBy?: string;
+}
+
+/**
+ * Sends a single SMS via Semaphore API and logs the transaction to the database.
+ */
+export async function sendSmsNotification(
+  phoneOrParams: string | SendSmsParams,
+  legacyMessage?: string,
+  legacyRecipientName?: string,
+  legacyType?: string
+) {
+  let recipient = '';
+  let recipientName: string | undefined;
+  let message = '';
+  let type = 'CUSTOM';
+  let sentBy = 'Admin';
+
+  if (typeof phoneOrParams === 'object') {
+    recipient = phoneOrParams.recipient || '';
+    recipientName = phoneOrParams.recipientName;
+    message = phoneOrParams.message || '';
+    type = phoneOrParams.type || 'CUSTOM';
+    sentBy = phoneOrParams.sentBy || 'Admin';
+  } else {
+    recipient = phoneOrParams || '';
+    message = legacyMessage || '';
+    recipientName = legacyRecipientName;
+    type = legacyType || 'CUSTOM';
+  }
+
   try {
-    // Format Philippine numbers starting with 09 to +639
-    let formattedPhone = phone.trim();
-    if (formattedPhone.startsWith('09') && formattedPhone.length === 11) {
-      formattedPhone = '+63' + formattedPhone.substring(1);
+    if (!recipient?.trim()) {
+      return { success: false, error: 'Recipient phone number is required.' };
+    }
+    if (!message?.trim()) {
+      return { success: false, error: 'SMS message content is required.' };
     }
 
-    const accountSid = process.env.TWILIO_ACCOUNT_SID;
-    const authToken = process.env.TWILIO_AUTH_TOKEN;
-    const fromPhone = process.env.TWILIO_PHONE_NUMBER;
-
-    if (!accountSid || !authToken || !fromPhone || accountSid === 'your_twilio_account_sid_here') {
-      return { success: false, error: 'Twilio credentials are not configured in the .env file.' };
+    const normalizedPhone = normalizePhilippineNumber(recipient);
+    if (!isValidPhilippineNumber(normalizedPhone)) {
+      return {
+        success: false,
+        error: `Invalid Philippine mobile number "${recipient}". Please use 11-digit format starting with 09 (e.g. 09171234567).`,
+      };
     }
 
-    const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+    const apiKey = process.env.SEMAPHORE_API_KEY;
+    const senderName = process.env.SEMAPHORE_SENDER_NAME;
 
-    const body = new URLSearchParams({
-      To: formattedPhone,
-      From: fromPhone,
-      Body: message,
-    });
+    if (!apiKey || apiKey === 'your_semaphore_api_key_here') {
+      const devNotice =
+        'SEMAPHORE_API_KEY is not configured in .env. Please add your Semaphore API key to enable SMS sending.';
+      
+      // Log attempt as Failed in database if model is ready
+      try {
+        await (prisma as any).smsNotification.create({
+          data: {
+            recipient: normalizedPhone,
+            recipientName: recipientName || null,
+            message: message.trim(),
+            status: 'Failed',
+            type,
+            senderName: senderName || 'SEMAPHORE',
+            sentBy,
+            errorMessage: 'SEMAPHORE_API_KEY not configured.',
+          },
+        });
+      } catch (dbErr) {
+        console.warn('Could not log unconfigured SMS to DB:', dbErr);
+      }
 
-    const response = await fetch(url, {
+      return {
+        success: false,
+        unconfigured: true,
+        error: devNotice,
+      };
+    }
+
+    const payload: Record<string, string> = {
+      apikey: apiKey.trim(),
+      number: normalizedPhone,
+      message: message.trim(),
+    };
+
+    if (senderName && senderName.trim()) {
+      payload.sendername = senderName.trim();
+    }
+
+    // Call Semaphore API securely from server
+    const response = await fetch('https://api.semaphore.co/api/v4/messages', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64'),
+        'Content-Type': 'application/json',
       },
-      body: body.toString(),
+      body: JSON.stringify(payload),
     });
 
     const data = await response.json();
 
-    if (response.ok) {
-      return { success: true, data };
-    } else {
-      return { success: false, error: data.message || 'Failed to send SMS via Twilio' };
+    if (response.ok && Array.isArray(data) && data.length > 0) {
+      const msg = data[0];
+      const semaphoreId = msg.message_id ? String(msg.message_id) : null;
+      // Semaphore statuses: 'Queued', 'Pending', 'Sent', 'Failed', 'Refunded'
+      const status = msg.status ? (msg.status.charAt(0).toUpperCase() + msg.status.slice(1)) : 'Queued';
+
+      // Save success log in database
+      let dbRecord = null;
+      try {
+        dbRecord = await (prisma as any).smsNotification.create({
+          data: {
+            recipient: normalizedPhone,
+            recipientName: recipientName || null,
+            message: message.trim(),
+            semaphoreId,
+            status,
+            type,
+            senderName: senderName || 'SEMAPHORE',
+            sentBy,
+          },
+        });
+      } catch (dbErr) {
+        console.warn('Could not save SMS log to DB:', dbErr);
+      }
+
+      revalidatePath('/admin/sms');
+
+      return {
+        success: true,
+        messageId: semaphoreId,
+        status,
+        recipient: normalizedPhone,
+        dbRecord,
+        data,
+      };
     }
+
+    // Handle error returned by Semaphore API
+    let errorMsg = 'Failed to send SMS via Semaphore.';
+    if (typeof data === 'string') {
+      errorMsg = data;
+    } else if (data?.message) {
+      errorMsg = Array.isArray(data.message) ? data.message.join(', ') : String(data.message);
+    } else if (data?.error) {
+      errorMsg = String(data.error);
+    }
+
+    // Log failed attempt in database
+    try {
+      await (prisma as any).smsNotification.create({
+        data: {
+          recipient: normalizedPhone,
+          recipientName: recipientName || null,
+          message: message.trim(),
+          status: 'Failed',
+          type,
+          senderName: senderName || 'SEMAPHORE',
+          sentBy,
+          errorMessage: errorMsg,
+        },
+      });
+    } catch (dbErr) {
+      console.warn('Could not save failed SMS log:', dbErr);
+    }
+
+    revalidatePath('/admin/sms');
+    return { success: false, error: errorMsg };
   } catch (error: any) {
-    console.error('Error sending SMS:', error);
-    return { success: false, error: error?.message || 'Failed to send SMS' };
+    console.error('[Semaphore SMS Exception]', error);
+    return {
+      success: false,
+      error: error?.message || 'An unexpected server error occurred while sending SMS.',
+    };
+  }
+}
+
+/**
+ * Sends bulk SMS messages. Can send customized messages per recipient or a shared broadcast.
+ */
+export async function sendBulkSmsNotification(params: {
+  recipients: Array<{ number: string; name?: string; message?: string }>;
+  defaultMessage?: string;
+  type?: string;
+  sentBy?: string;
+}) {
+  const { recipients, defaultMessage = '', type = 'BULK', sentBy = 'Admin' } = params;
+
+  if (!recipients || recipients.length === 0) {
+    return { success: false, error: 'Please provide at least one recipient.' };
+  }
+
+  const results: Array<{
+    recipient: string;
+    name?: string;
+    success: boolean;
+    messageId?: string;
+    status?: string;
+    error?: string;
+  }> = [];
+
+  let successCount = 0;
+  let failCount = 0;
+
+  for (const item of recipients) {
+    const msgToSend = item.message || defaultMessage;
+    if (!msgToSend.trim()) continue;
+
+    const res = await sendSmsNotification({
+      recipient: item.number,
+      recipientName: item.name,
+      message: msgToSend,
+      type,
+      sentBy,
+    });
+
+    if (res.success) {
+      successCount++;
+      results.push({
+        recipient: item.number,
+        name: item.name,
+        success: true,
+        messageId: res.messageId || undefined,
+        status: res.status,
+      });
+    } else {
+      failCount++;
+      results.push({
+        recipient: item.number,
+        name: item.name,
+        success: false,
+        error: res.error,
+      });
+    }
+  }
+
+  revalidatePath('/admin/sms');
+
+  return {
+    success: successCount > 0,
+    total: recipients.length,
+    successCount,
+    failCount,
+    results,
+  };
+}
+
+/**
+ * Retrieves paginated SMS history from the database with search and status filtering.
+ */
+export async function getSmsHistory(options?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+  type?: string;
+  startDate?: string;
+  endDate?: string;
+}) {
+  try {
+    const page = Math.max(1, options?.page || 1);
+    const limit = Math.max(1, Math.min(100, options?.limit || 10));
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+
+    if (options?.search && options.search.trim()) {
+      const q = options.search.trim();
+      where.OR = [
+        { recipient: { contains: q, mode: 'insensitive' } },
+        { recipientName: { contains: q, mode: 'insensitive' } },
+        { message: { contains: q, mode: 'insensitive' } },
+        { semaphoreId: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+
+    if (options?.status && options.status !== 'all') {
+      where.status = { equals: options.status, mode: 'insensitive' };
+    }
+
+    if (options?.type && options.type !== 'all') {
+      where.type = { equals: options.type, mode: 'insensitive' };
+    }
+
+    if (options?.startDate || options?.endDate) {
+      where.createdAt = {};
+      if (options.startDate) {
+        where.createdAt.gte = new Date(options.startDate);
+      }
+      if (options.endDate) {
+        const end = new Date(options.endDate);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
+
+    const [total, records] = await Promise.all([
+      (prisma as any).smsNotification.count({ where }),
+      (prisma as any).smsNotification.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      success: true,
+      records,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1,
+      },
+    };
+  } catch (error: any) {
+    console.error('Error fetching SMS history:', error);
+    return {
+      success: false,
+      records: [],
+      pagination: { page: 1, limit: 10, total: 0, totalPages: 1 },
+      error: error?.message || 'Failed to fetch SMS history.',
+    };
+  }
+}
+
+/**
+ * Retrieves aggregate SMS delivery statistics for the admin dashboard.
+ */
+export async function getSmsStats() {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [total, delivered, queued, failed, todayCount] = await Promise.all([
+      (prisma as any).smsNotification.count(),
+      (prisma as any).smsNotification.count({ where: { status: { in: ['Sent', 'Delivered'] } } }),
+      (prisma as any).smsNotification.count({ where: { status: { in: ['Queued', 'Pending'] } } }),
+      (prisma as any).smsNotification.count({ where: { status: 'Failed' } }),
+      (prisma as any).smsNotification.count({ where: { createdAt: { gte: today } } }),
+    ]);
+
+    return {
+      success: true,
+      stats: {
+        total,
+        delivered,
+        queued,
+        failed,
+        todayCount,
+      },
+    };
+  } catch (error: any) {
+    console.error('Error fetching SMS stats:', error);
+    return {
+      success: false,
+      stats: { total: 0, delivered: 0, queued: 0, failed: 0, todayCount: 0 },
+      error: error?.message,
+    };
+  }
+}
+
+/**
+ * Deletes an SMS log record from the database.
+ */
+export async function deleteSmsLog(id: string) {
+  try {
+    await (prisma as any).smsNotification.delete({
+      where: { id },
+    });
+    revalidatePath('/admin/sms');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error deleting SMS log:', error);
+    return { success: false, error: error?.message || 'Failed to delete log entry.' };
   }
 }
