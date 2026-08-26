@@ -7,13 +7,16 @@ import {
   sendBulkSmsNotification,
   getSmsHistory,
   getSmsStats,
+  deleteSmsLog,
+} from '../../../actions/sms';
+import {
   normalizePhilippineNumber,
   isValidPhilippineNumber,
   calculateSmsSegments,
-  deleteSmsLog,
-} from '../../../actions/sms';
+} from '../../../../lib/sms-utils';
 import { getPaymentRecords } from '../../../actions/payments';
 import { getInquiries } from '../../../actions/inquiry';
+
 
 interface SmsLogItem {
   id: string;
