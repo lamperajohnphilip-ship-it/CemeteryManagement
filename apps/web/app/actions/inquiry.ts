@@ -176,7 +176,7 @@ export async function acceptInquiry(id: number, remarks?: string) {
 
     if (existing.CONTACT && existing.CONTACT.trim()) {
       const dateSnippet = formattedDate ? ` on ${formattedDate}${existing.TIME ? ' at ' + existing.TIME : ''}` : '';
-      const smsMessage = `Good day ${existing.FAMILY_NAME}, your cemetery inquiry (Ref: ${existing.APP_ID}) has been APPROVED by the Municipality of Jasaan Cemetery Management Office. Please visit the office${dateSnippet}. Thank you.`;
+      const smsMessage = `Hi ${existing.FAMILY_NAME}, your inquiry (Ref: ${existing.APP_ID}) has been APPROVED. Please visit the Jasaan Cemetery Office${dateSnippet}.`;
 
       try {
         const smsResult = await sendSmsNotification({
@@ -232,7 +232,7 @@ export async function updateInquiryStatus(id: number, status: string, remarks?: 
 
     // If status is Rejected, notify citizen via SMS
     if (status.toLowerCase() === 'rejected' && existing?.CONTACT) {
-      const rejectSms = `Good day ${existing.FAMILY_NAME}, regarding your cemetery inquiry (${existing.APP_ID}): your request was not approved. Please contact the Jasaan Cemetery Office for assistance.`;
+      const rejectSms = `Hi ${existing.FAMILY_NAME}, your inquiry (${existing.APP_ID}) was not approved. Contact the Jasaan Cemetery Office for assistance.`;
       try {
         await sendSmsNotification({
           recipient: existing.CONTACT,

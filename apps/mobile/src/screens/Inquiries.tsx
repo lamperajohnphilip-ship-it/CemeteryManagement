@@ -44,6 +44,20 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
   const [isSuccess, setIsSuccess] = useState(false);
   const [refNum, setRefNum] = useState('');
 
+  // Feedback states on inquiry finish
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+
+  const quickFeedbackOptions = [
+    'Fast & Easy',
+    'Clear Instructions',
+    'Helpful Support',
+    'Smooth Booking'
+  ];
+
   const [showRelationDropdown, setShowRelationDropdown] = useState(false);
   const [showTimeDropdown, setShowTimeDropdown] = useState(false);
 
@@ -149,6 +163,42 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
     }
   };
 
+  const toggleFeedbackTag = (tag: string) => {
+    if (selectedTags.includes(tag)) {
+      setSelectedTags(selectedTags.filter(t => t !== tag));
+    } else {
+      setSelectedTags([...selectedTags, tag]);
+    }
+  };
+
+  const handleFeedbackSubmit = async () => {
+    if (feedbackRating === 0) {
+      alert('Please select a star rating.');
+      return;
+    }
+    setIsSubmittingFeedback(true);
+    const userName = `${formData.firstName.trim()} ${formData.lastName.trim()}` || 'Citizen User';
+    const tagText = selectedTags.length > 0 ? `[${selectedTags.join(', ')}] ` : '';
+    const fullComment = `${tagText}${feedbackComment}`.trim() || 'Great service experience!';
+
+    try {
+      await fetch(`${baseUrl}/api/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userName,
+          rating: feedbackRating,
+          comment: fullComment,
+        }),
+      });
+    } catch (err) {
+      console.error('Error syncing feedback on mobile:', err);
+    } finally {
+      setIsSubmittingFeedback(false);
+      setFeedbackSubmitted(true);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       firstName: '',
@@ -165,6 +215,10 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
       preferredTime: '',
       notes: ''
     });
+    setFeedbackRating(5);
+    setFeedbackComment('');
+    setSelectedTags([]);
+    setFeedbackSubmitted(false);
     setStep(1);
     setIsSuccess(false);
   };
@@ -213,6 +267,87 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
               <Text style={styles.successDetKey}>STATUS</Text>
               <Text style={[styles.successDetVal, { color: '#facc15', fontWeight: 'bold' }]}>PENDING</Text>
             </View>
+          </View>
+
+          {/* Inquiry Completion User Feedback Section */}
+          <View style={[styles.feedbackBox, { backgroundColor: colors.appBg, borderColor: colors.goldBorder }]}>
+            {feedbackSubmitted ? (
+              <View style={styles.feedbackSubmittedBox}>
+                <Text style={styles.feedbackSubmittedStars}>{'★'.repeat(feedbackRating)}{'☆'.repeat(5 - feedbackRating)}</Text>
+                <Text style={[styles.feedbackSubmittedTitle, { color: colors.gold }]}>Thank You for Your Feedback!</Text>
+                <Text style={[styles.feedbackSubmittedDesc, { color: colors.boneMuted }]}>
+                  You rated our booking service {feedbackRating}/5 stars. Your review helps us improve cemetery online services for everyone.
+                </Text>
+              </View>
+            ) : (
+              <View>
+                <Text style={[styles.feedbackTitle, { color: colors.gold }]}>⭐ Rate Your Experience</Text>
+                <Text style={[styles.feedbackSub, { color: colors.boneMuted }]}>How was your inquiry booking process?</Text>
+
+                {/* Stars */}
+                <View style={styles.feedbackStarsRow}>
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <TouchableOpacity
+                      key={star}
+                      style={styles.feedbackStarBtn}
+                      onPress={() => setFeedbackRating(star)}
+                    >
+                      <Text style={[styles.feedbackStarText, feedbackRating >= star && styles.feedbackStarActive]}>
+                        ⭐
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Quick Tags */}
+                <View style={styles.feedbackTagsRow}>
+                  {quickFeedbackOptions.map(tag => {
+                    const isSelected = selectedTags.includes(tag);
+                    return (
+                      <TouchableOpacity
+                        key={tag}
+                        style={[
+                          styles.feedbackTag,
+                          { backgroundColor: colors.cardBg, borderColor: colors.divider },
+                          isSelected && [styles.feedbackTagSelected, { borderColor: colors.gold, backgroundColor: colors.goldHover || 'rgba(200, 168, 75, 0.15)' }]
+                        ]}
+                        onPress={() => toggleFeedbackTag(tag)}
+                      >
+                        <Text style={[
+                          styles.feedbackTagText,
+                          { color: colors.boneMuted },
+                          isSelected && [styles.feedbackTagTextSelected, { color: colors.gold }]
+                        ]}>
+                          {isSelected ? '✓ ' : ''}{tag}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Comment Input */}
+                <TextInput
+                  style={[styles.feedbackInput, { backgroundColor: colors.cardBg, borderColor: colors.inputBorder, color: colors.text }]}
+                  placeholder="Additional thoughts or suggestions? (optional)"
+                  placeholderTextColor={colors.boneDim}
+                  value={feedbackComment}
+                  onChangeText={setFeedbackComment}
+                  multiline={true}
+                  numberOfLines={2}
+                />
+
+                {/* Submit Feedback Button */}
+                <TouchableOpacity
+                  style={[styles.feedbackSubmitBtn, { backgroundColor: colors.gold }]}
+                  onPress={handleFeedbackSubmit}
+                  disabled={isSubmittingFeedback}
+                >
+                  <Text style={[styles.feedbackSubmitBtnText, { color: colors.stone }]}>
+                    {isSubmittingFeedback ? 'Submitting...' : 'Submit Feedback'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           <Text style={[styles.successInfo, { color: colors.boneMuted }]}>
@@ -977,5 +1112,115 @@ const getStyles = (colors: any) => StyleSheet.create({
     color: colors.gold,
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  feedbackBox: {
+    width: '100%',
+    backgroundColor: colors.appBg,
+    borderWidth: 1,
+    borderColor: colors.goldBorder,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 20,
+  },
+  feedbackTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: colors.gold,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  feedbackSub: {
+    fontSize: 11,
+    color: colors.boneDim,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  feedbackStarsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  feedbackStarBtn: {
+    padding: 4,
+  },
+  feedbackStarText: {
+    fontSize: 24,
+    opacity: 0.35,
+  },
+  feedbackStarActive: {
+    opacity: 1,
+  },
+  feedbackTagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  feedbackTag: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.divider,
+    backgroundColor: colors.cardBg,
+  },
+  feedbackTagSelected: {
+    borderColor: colors.gold,
+    backgroundColor: colors.goldHover || 'rgba(200, 168, 75, 0.15)',
+  },
+  feedbackTagText: {
+    fontSize: 11,
+    color: colors.boneMuted,
+  },
+  feedbackTagTextSelected: {
+    color: colors.gold,
+    fontWeight: 'bold',
+  },
+  feedbackInput: {
+    width: '100%',
+    backgroundColor: colors.cardBg,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+    borderRadius: 6,
+    padding: 10,
+    color: colors.text,
+    fontSize: 12,
+    minHeight: 50,
+    textAlignVertical: 'top',
+    marginBottom: 12,
+  },
+  feedbackSubmitBtn: {
+    backgroundColor: colors.gold,
+    borderRadius: 6,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  feedbackSubmitBtnText: {
+    color: colors.stone,
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  feedbackSubmittedBox: {
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  feedbackSubmittedStars: {
+    fontSize: 20,
+    color: colors.gold,
+    marginBottom: 6,
+  },
+  feedbackSubmittedTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  feedbackSubmittedDesc: {
+    fontSize: 11,
+    color: colors.boneDim,
+    textAlign: 'center',
   },
 });

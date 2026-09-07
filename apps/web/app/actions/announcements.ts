@@ -25,20 +25,6 @@ async function seedFromLegacy() {
             validFrom: ann.validFrom || null,
             validUntil: ann.validUntil || null,
             views: ann.views || 0,
-            reactions: {
-              create: Object.entries(ann.reactions || {}).flatMap(([type, count]) => 
-                Array(count as number).fill({ type })
-              )
-            },
-            comments: {
-              create: (ann.comments || []).map((c: any) => ({
-                author: c.author,
-                avatar: c.avatar,
-                text: c.text,
-                date: new Date(c.date || Date.now()),
-                likes: c.likes || 0
-              }))
-            }
           }
         });
       }
@@ -66,45 +52,22 @@ export async function getAnnouncements(incrementViews = false) {
     }
 
     const records = await prisma.announcement.findMany({
-      include: {
-        reactions: true,
-        comments: true
-      },
       orderBy: { date: 'desc' }
     });
 
-    const formatted = records.map(record => {
-      // Aggregate reactions
-      const reactionCounts = { like: 0, heart: 0, pray: 0 };
-      record.reactions.forEach(r => {
-        if (r.type === 'like') reactionCounts.like++;
-        else if (r.type === 'heart') reactionCounts.heart++;
-        else if (r.type === 'pray') reactionCounts.pray++;
-      });
-
-      return {
-        id: record.id,
-        title: record.title,
-        content: record.content,
-        category: record.category,
-        badge: record.badge,
-        visibility: record.visibility,
-        status: record.status,
-        date: record.date.toISOString(),
-        validFrom: record.validFrom,
-        validUntil: record.validUntil,
-        views: record.views,
-        reactions: reactionCounts,
-        comments: record.comments.map(c => ({
-          id: c.id,
-          author: c.author,
-          avatar: c.avatar,
-          text: c.text,
-          date: c.date.toISOString(),
-          likes: c.likes
-        }))
-      };
-    });
+    const formatted = records.map(record => ({
+      id: record.id,
+      title: record.title,
+      content: record.content,
+      category: record.category,
+      badge: record.badge,
+      visibility: record.visibility,
+      status: record.status,
+      date: record.date.toISOString(),
+      validFrom: record.validFrom,
+      validUntil: record.validUntil,
+      views: record.views,
+    }));
 
     return { success: true, announcements: formatted };
   } catch (error: any) {
@@ -194,66 +157,5 @@ export async function toggleAnnouncementStatus(id: number) {
   } catch (error: any) {
     console.error('Failed to toggle status:', error);
     return { success: false, error: 'Failed to update announcement status. Please try again.' };
-  }
-}
-
-export async function addReaction(id: number, type: 'like' | 'heart' | 'pray') {
-  try {
-    await prisma.announcementReaction.create({
-      data: {
-        type,
-        announcementId: id
-      }
-    });
-    revalidatePath('/announcements');
-    return { success: true };
-  } catch (error: any) {
-    console.error('Failed to add reaction:', error);
-    return { success: false, error: error.message };
-  }
-}
-
-export async function addComment(id: number, comment: { author: string; avatar: string; text: string }) {
-  try {
-    await prisma.announcementComment.create({
-      data: {
-        author: comment.author,
-        avatar: comment.avatar,
-        text: comment.text,
-        announcementId: id,
-        date: new Date()
-      }
-    });
-    revalidatePath('/announcements');
-    return { success: true };
-  } catch (error: any) {
-    console.error('Failed to add comment:', error);
-    return { success: false, error: error.message };
-  }
-}
-
-export async function deleteComment(annId: number, commentId: number) {
-  try {
-    await prisma.announcementComment.delete({ where: { id: commentId } });
-    revalidatePath('/admin/announcements');
-    revalidatePath('/announcements');
-    return { success: true };
-  } catch (error: any) {
-    console.error('Failed to delete comment:', error);
-    return { success: false, error: error.message };
-  }
-}
-
-export async function likeComment(annId: number, commentId: number) {
-  try {
-    await prisma.announcementComment.update({
-      where: { id: commentId },
-      data: { likes: { increment: 1 } }
-    });
-    revalidatePath('/announcements');
-    return { success: true };
-  } catch (error: any) {
-    console.error('Failed to like comment:', error);
-    return { success: false, error: error.message };
   }
 }

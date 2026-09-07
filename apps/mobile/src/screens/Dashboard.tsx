@@ -75,10 +75,6 @@ export default function Dashboard({ baseUrl, onLocateGrave, theme = 'dark' }: Sc
   const [refreshing, setRefreshing] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<any | null>(null);
 
-  // Rating states
-  const [showRatingModal, setShowRatingModal] = useState(false);
-  const [rating, setRating] = useState(0);
-  const [ratingComment, setRatingComment] = useState('');
 
   // Animation values
   const searchAnim = useRef(new Animated.Value(0)).current;
@@ -131,14 +127,8 @@ export default function Dashboard({ baseUrl, onLocateGrave, theme = 'dark' }: Sc
       loadRecords(false);
     }, 30000);
 
-    // Trigger rating modal after 12 seconds if not rated yet
-    const timer = setTimeout(() => {
-      setShowRatingModal(true);
-    }, 12000);
-
     return () => {
       clearInterval(interval);
-      clearTimeout(timer);
     };
   }, []);
 
@@ -177,7 +167,7 @@ export default function Dashboard({ baseUrl, onLocateGrave, theme = 'dark' }: Sc
       <Text style={[styles.resultName, { color: colors.text }]} numberOfLines={1}>
         {parts.map((part, i) =>
           regex.test(part) ? (
-            <Text key={i} style={{ backgroundColor: colors.goldBorder, color: colors.cream || colors.appBg }}>{part}</Text>
+            <Text key={i} style={{ backgroundColor: colors.goldBorder, color: colors.text }}>{part}</Text>
           ) : (
             <Text key={i}>{part}</Text>
           )
@@ -191,31 +181,6 @@ export default function Dashboard({ baseUrl, onLocateGrave, theme = 'dark' }: Sc
     setShowResults(false);
   };
 
-  const handleRatingSubmit = async () => {
-    if (rating === 0) {
-      alert('Please select a star rating.');
-      return;
-    }
-    
-    // Sync rating feedback to backend
-    try {
-      await fetch(`${baseUrl}/api/feedback`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: 'MobileUser_' + Math.floor(Math.random() * 10000),
-          rating,
-          comment: ratingComment
-        })
-      });
-    } catch (err) {
-      console.error('Error syncing rating feedback to backend:', err);
-    }
-
-    // Success feedback
-    alert('Thank you for your feedback!');
-    setShowRatingModal(false);
-  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.appBg }]}>
@@ -397,71 +362,6 @@ export default function Dashboard({ baseUrl, onLocateGrave, theme = 'dark' }: Sc
         </Modal>
       )}
 
-      {/* Rating / Feedback Modal */}
-      {showRatingModal && (
-        <Modal
-          visible={true}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setShowRatingModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.profileCard, { backgroundColor: colors.modalBg, borderColor: colors.goldBorder }]}>
-              <View style={[styles.profileHeader, { borderBottomColor: colors.divider }]}>
-                <Text style={[styles.ratingTitle, { color: colors.gold }]}>Enjoying the Portal?</Text>
-                <TouchableOpacity
-                  style={styles.profileClose}
-                  onPress={() => setShowRatingModal(false)}
-                >
-                  <Text style={[styles.closeText, { color: colors.textMuted }]}>&times;</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={[styles.profileBody, { alignItems: 'center' }]}>
-                <Text style={[styles.ratingSubtitle, { color: colors.boneMuted }]}>Please take a moment to rate your experience.</Text>
-
-                <View style={styles.ratingStars}>
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <TouchableOpacity
-                      key={star}
-                      onPress={() => setRating(star)}
-                      style={styles.starBtn}
-                    >
-                      <Text style={[styles.starEmoji, rating >= star && styles.starEmojiFilled]}>
-                        ⭐
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <TextInput
-                  style={[styles.ratingComment, { backgroundColor: colors.inputBg, borderColor: colors.goldBorder, color: colors.text }]}
-                  placeholder="Tell us what you think (optional)"
-                  placeholderTextColor={colors.boneDim}
-                  value={ratingComment}
-                  onChangeText={setRatingComment}
-                  multiline={true}
-                  numberOfLines={3}
-                />
-
-                <View style={styles.profileActions}>
-                  <TouchableOpacity
-                    style={[styles.profileBtn, styles.profileBtnSecondary, { borderColor: colors.divider }]}
-                    onPress={() => setShowRatingModal(false)}
-                  >
-                    <Text style={[styles.btnSecondaryText, { color: colors.text }]}>Maybe Later</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.profileBtn, styles.profileBtnPrimary, { backgroundColor: colors.gold }]}
-                    onPress={handleRatingSubmit}
-                  >
-                    <Text style={[styles.btnPrimaryText, { color: colors.stone }]}>Submit Feedback</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
     </View>
   );
 }

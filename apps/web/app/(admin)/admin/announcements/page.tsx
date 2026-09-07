@@ -21,8 +21,6 @@ interface Announcement {
   validFrom: string | null;
   validUntil: string | null;
   views: number;
-  reactions: { like: number; heart: number; pray: number };
-  comments: any[];
 }
 
 export default function AnnouncementsPage() {

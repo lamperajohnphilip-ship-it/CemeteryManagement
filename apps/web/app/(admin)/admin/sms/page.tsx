@@ -163,7 +163,51 @@ export default function SMSNotificationsPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bulkTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load initial stats, history, and recipient candidates on mount
+  // SMS Gateway & Supabase Status State
+  const [gatewayStatus, setGatewayStatus] = useState<{
+    loading: boolean;
+    configured: boolean;
+    accountName?: string;
+    status?: string;
+    creditBalance?: number;
+    senderName?: string;
+    error?: string;
+  }>({
+    loading: false,
+    configured: true,
+  });
+
+  const checkGateway = async () => {
+    setGatewayStatus(prev => ({ ...prev, loading: true }));
+    try {
+      const res = await fetch('/api/admin/sms/test');
+      const data = await res.json();
+      if (data.success && data.account) {
+        setGatewayStatus({
+          loading: false,
+          configured: true,
+          accountName: data.account.account_name,
+          status: data.account.status,
+          creditBalance: data.account.credit_balance,
+          senderName: data.senderName,
+        });
+      } else {
+        setGatewayStatus({
+          loading: false,
+          configured: data.configured ?? false,
+          error: data.message || data.error || 'Gateway test failed',
+        });
+      }
+    } catch (e: any) {
+      setGatewayStatus({
+        loading: false,
+        configured: true,
+        error: e?.message || 'Failed to connect to gateway',
+      });
+    }
+  };
+
+  // Load initial stats, history, recipient candidates, and gateway health on mount
   useEffect(() => {
     loadAllData();
   }, []);
@@ -179,6 +223,7 @@ export default function SMSNotificationsPage() {
     fetchStats();
     fetchHistory();
     fetchPayors();
+    checkGateway();
   };
 
   const fetchStats = async () => {
@@ -534,6 +579,58 @@ export default function SMSNotificationsPage() {
         </p>
       </div>
 
+      {/* Supabase & Semaphore Gateway Health Card */}
+      <div className={styles.gatewayStatusCard}>
+        <div className={styles.gatewayStatusLeft}>
+          <div className={styles.gatewayBadgesRow}>
+            <span className={`${styles.gatewayBadge} ${styles.badgeOnline}`}>
+              <span>🟢</span> Supabase Database: Connected (<code>sms_notifications</code>)
+            </span>
+            {gatewayStatus.loading ? (
+              <span className={`${styles.gatewayBadge} ${styles.badgeWarning}`}>
+                <span>⏳</span> Checking Semaphore Gateway...
+              </span>
+            ) : gatewayStatus.error ? (
+              <span className={`${styles.gatewayBadge} ${styles.badgeError}`}>
+                <span>🔴</span> Gateway: {gatewayStatus.error}
+              </span>
+            ) : (
+              <span
+                className={`${styles.gatewayBadge} ${
+                  gatewayStatus.status === 'Active' ? styles.badgeOnline : styles.badgeWarning
+                }`}
+              >
+                <span>{gatewayStatus.status === 'Active' ? '🟢' : '🟡'}</span>
+                Semaphore API: {gatewayStatus.status || 'Connected'} ({gatewayStatus.creditBalance ?? 0} Credits)
+              </span>
+            )}
+          </div>
+          <div className={styles.gatewayDetails}>
+            {gatewayStatus.accountName && (
+              <span>Account: <strong>{gatewayStatus.accountName}</strong> &bull; </span>
+            )}
+            <span>Sender Name: <strong>{gatewayStatus.senderName || 'SEMAPHORE'}</strong> &bull; </span>
+            <span>Telcos: Globe, Smart, DITO, TNT, TM &bull; </span>
+            <span>All logs saved automatically to Supabase.</span>
+            {gatewayStatus.creditBalance === 0 && (
+              <span style={{ display: 'block', marginTop: '4px', color: '#e6b064' }}>
+                ℹ️ Account balance is currently 0 credits or pending approval on Semaphore.co. Dispatched messages will be recorded and marked as Failed/Pending in Supabase until topped up.
+              </span>
+            )}
+          </div>
+        </div>
+        <div className={styles.gatewayActions}>
+          <button
+            className={styles.btnOutline}
+            onClick={checkGateway}
+            disabled={gatewayStatus.loading}
+            title="Ping Semaphore gateway API to re-check balance & status"
+          >
+            {gatewayStatus.loading ? 'Pinging...' : '🔄 Refresh API Status'}
+          </button>
+        </div>
+      </div>
+
       {/* Aggregate Stats Cards */}
       <div className={styles.smsStats}>
         <div className={styles.smsStatCard}>
@@ -642,7 +739,7 @@ export default function SMSNotificationsPage() {
                   value={recipientPhone}
                   onChange={e => setRecipientPhone(e.target.value)}
                 />
-                <span className={styles.inputHint}>Accepts 09..., +639..., or 639... (Globe, Smart, DITO)</span>
+
               </div>
 
               <div className={styles.formGroup}>

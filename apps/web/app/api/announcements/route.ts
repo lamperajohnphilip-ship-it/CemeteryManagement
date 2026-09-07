@@ -1,12 +1,8 @@
 import { NextResponse } from 'next/server';
 import { 
   getAnnouncements, 
-  addReaction, 
-  addComment, 
-  likeComment, 
-  deleteComment,
-  saveAnnouncement,
-  deleteAnnouncement,
+  saveAnnouncement, 
+  deleteAnnouncement, 
   toggleAnnouncementStatus
 } from '../../actions/announcements';
 
@@ -33,22 +29,6 @@ export async function POST(request: Request) {
 
     let result;
     switch (action) {
-      case 'react':
-        result = await addReaction(body.id, body.type);
-        break;
-      case 'comment':
-        result = await addComment(body.id, {
-          author: body.comment.author,
-          avatar: body.comment.avatar,
-          text: body.comment.text
-        });
-        break;
-      case 'likeComment':
-        result = await likeComment(body.annId, body.commentId);
-        break;
-      case 'deleteComment':
-        result = await deleteComment(body.annId, body.commentId);
-        break;
       case 'save':
         result = await saveAnnouncement(body.announcement);
         break;

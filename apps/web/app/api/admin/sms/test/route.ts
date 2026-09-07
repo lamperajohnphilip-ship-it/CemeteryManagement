@@ -43,10 +43,13 @@ export async function GET(_req: NextRequest) {
       message: 'Semaphore API connected successfully!',
     });
   } catch (error: any) {
+    console.error('Semaphore fetch error:', error);
     return NextResponse.json({
       success: false,
       configured: true,
       error: error?.message || 'Failed to connect to Semaphore gateway.',
+      cause: error?.cause ? String(error.cause) : undefined,
+      code: error?.cause?.code || error?.code,
     }, { status: 500 });
   }
 }

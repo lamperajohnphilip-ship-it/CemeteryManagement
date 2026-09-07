@@ -112,33 +112,7 @@ model Announcement {
   validUntil  String?
   views       Int      @default(0)
 
-  reactions   AnnouncementReaction[]
-  comments    AnnouncementComment[]
-
   @@map("announcements")
-}
-
-model AnnouncementReaction {
-  id             Int          @id @default(autoincrement())
-  type           String       // 'like', 'heart', 'pray'
-  announcementId Int
-  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
-
-  @@map("announcement_reactions")
-}
-
-model AnnouncementComment {
-  id             Int          @id @default(autoincrement())
-  author         String
-  avatar         String
-  text           String
-  date           DateTime     @default(now())
-  likes          Int          @default(0)
-  
-  announcementId Int
-  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
-
-  @@map("announcement_comments")
 }
 
 model SmsNotification {

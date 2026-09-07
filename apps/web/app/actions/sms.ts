@@ -134,7 +134,15 @@ export async function sendSmsNotification(
       body: JSON.stringify(payload),
     });
 
-    const data = await response.json();
+    // Semaphore sometimes returns plain text (e.g. "Your account has insufficient credits")
+    // instead of JSON — safely read as text first, then parse.
+    const rawBody = await response.text();
+    let data: any;
+    try {
+      data = JSON.parse(rawBody);
+    } catch {
+      data = rawBody; // treat raw text as the error message
+    }
 
     if (response.ok && Array.isArray(data) && data.length > 0) {
       const msg = data[0];

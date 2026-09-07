@@ -98,7 +98,7 @@ export async function addDeceasedRecord(data: {
     if (data.CONTACT_NO && data.CONTACT_NO.trim()) {
       try {
         const { sendSmsNotification } = await import('./sms');
-        const burialSms = `Dear ${data.PAYORS_NAME}, the burial record for ${data.NAME_OF_DECEASED} (Ref: ${refNo}) has been officially registered in the Municipality of Jasaan Cemetery system. Thank you.`;
+        const burialSms = `Dear ${data.PAYORS_NAME}, the burial record for ${data.NAME_OF_DECEASED} (Ref: ${refNo}) has been registered. - Jasaan Cemetery`;
         await sendSmsNotification({
           recipient: data.CONTACT_NO.trim(),
           recipientName: data.PAYORS_NAME,

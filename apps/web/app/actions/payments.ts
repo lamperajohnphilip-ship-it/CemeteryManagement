@@ -140,7 +140,7 @@ export async function addPaymentRecord(data: {
     if (data.CONTACT_NO && data.CONTACT_NO.trim()) {
       try {
         const { sendSmsNotification } = await import('./sms');
-        const smsText = `OFFICIAL RECEIPT: Payment of ₱${paid.toLocaleString()} for the account of ${data.NAME_OF_DECEASED} received. Remaining Balance: ₱${balance.toLocaleString()}. Ref: ${refNo}. Municipality of Jasaan Cemetery.`;
+        const smsText = `Payment of P${paid.toLocaleString()} for ${data.NAME_OF_DECEASED} received. Balance: P${balance.toLocaleString()}. Ref: ${refNo}. - Jasaan Cemetery`;
         await sendSmsNotification({
           recipient: data.CONTACT_NO.trim(),
           recipientName: data.PAYORS_NAME,

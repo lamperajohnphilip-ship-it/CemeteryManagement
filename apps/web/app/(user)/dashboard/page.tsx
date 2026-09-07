@@ -53,12 +53,6 @@ export default function Home() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<any | null>(null);
-  
-  // Rating states
-  const [showRatingModal, setShowRatingModal] = useState(false);
-  const [rating, setRating] = useState(0);
-  const [hoverRating, setHoverRating] = useState(0);
-  const [ratingComment, setRatingComment] = useState('');
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
@@ -135,19 +129,9 @@ export default function Home() {
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleEsc);
 
-    // Auto "Rate Us" logic
-    let timer: NodeJS.Timeout;
-    const hasRated = localStorage.getItem('hasRated');
-    if (!hasRated) {
-      timer = setTimeout(() => {
-        setShowRatingModal(true);
-      }, 10000); // Popup after 10 seconds
-    }
-
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEsc);
-      if (timer) clearTimeout(timer);
     };
   }, []);
 
@@ -193,48 +177,6 @@ export default function Home() {
     setShowResults(false);
   };
 
-  const handleRatingSubmit = async () => {
-    if (rating === 0) {
-      alert('Please select a star rating before submitting.');
-      return;
-    }
-    const userId = 'User_' + Math.floor(Math.random() * 10000);
-    const newFeedback = {
-      id: Date.now(),
-      user_id: userId,
-      rating,
-      comment: ratingComment,
-      date: new Date().toISOString()
-    };
-
-    // Save locally
-    const feedbackList = JSON.parse(localStorage.getItem('user_feedback') || '[]');
-    feedbackList.push(newFeedback);
-    localStorage.setItem('user_feedback', JSON.stringify(feedbackList));
-    localStorage.setItem('hasRated', 'true');
-    setShowRatingModal(false);
-    
-    const adminFeedback = JSON.parse(localStorage.getItem('cemeteryFeedback') || '[]');
-    adminFeedback.push(newFeedback);
-    localStorage.setItem('cemeteryFeedback', JSON.stringify(adminFeedback));
-    
-    // Sync to backend
-    try {
-      await fetch('/api/feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: userId,
-          rating,
-          comment: ratingComment
-        })
-      });
-    } catch (err) {
-      console.error('Failed to sync feedback to backend API:', err);
-    }
-
-    alert('Thank you for your valuable feedback!');
-  };
 
   return (
     <main>
@@ -301,47 +243,6 @@ export default function Home() {
         </div>
       )}
 
-      {showRatingModal && (
-        <div className={styles.profileModal}>
-          <div className={styles.profileCard}>
-            <div className={styles.profileHeader}>
-              <h2 style={{ fontFamily: 'Cinzel', color: 'var(--stone)', margin: 0, fontSize: '1.4rem' }}>Enjoying the Portal?</h2>
-              <div className={styles.profileClose} onClick={() => { setShowRatingModal(false); localStorage.setItem('hasRated', 'true'); }}>&times;</div>
-            </div>
-            <div className={styles.profileBody} style={{ textAlign: 'center' }}>
-              <p style={{ color: 'var(--text-muted)', marginBottom: '1rem', fontSize: '0.9rem' }}>Please take a moment to rate your experience.</p>
-              
-              <div className={styles.ratingStars}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    className={`${styles.star} ${rating >= star || hoverRating >= star ? styles.starFilled : ''}`}
-                    onClick={() => setRating(star)}
-                    onMouseEnter={() => setHoverRating(star)}
-                    onMouseLeave={() => setHoverRating(0)}
-                  >
-                    <svg viewBox="0 0 24 24">
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                    </svg>
-                  </button>
-                ))}
-              </div>
-
-              <textarea
-                className={styles.ratingComment}
-                placeholder="Tell us what you think (optional)"
-                value={ratingComment}
-                onChange={(e) => setRatingComment(e.target.value)}
-              />
-
-              <div className={styles.profileActions}>
-                <button className={`${styles.profileBtn} ${styles.profileBtnSecondary}`} onClick={() => { setShowRatingModal(false); localStorage.setItem('hasRated', 'true'); }}>Maybe Later</button>
-                <button className={`${styles.profileBtn} ${styles.profileBtnPrimary}`} onClick={handleRatingSubmit}>Submit Feedback</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <section className={styles.hero} id="home">
         <div className={styles.topLine}></div>
