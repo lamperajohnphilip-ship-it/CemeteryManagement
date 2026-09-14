@@ -43,6 +43,19 @@ export default function Navigation() {
     }
   }, []);
 
+  const [maintenance, setMaintenance] = useState<{ mode: boolean; message: string } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/settings/public')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.maintenanceMode) {
+          setMaintenance({ mode: true, message: data.maintenanceMessage || 'System maintenance in progress.' });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const navItems = [
     {
       name: 'DASHBOARD', path: '/dashboard', icon: (
@@ -101,6 +114,30 @@ export default function Navigation() {
 
   return (
     <>
+      {maintenance?.mode && (
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #7f1d1d, #991b1b)',
+            color: '#fef2f2',
+            padding: '10px 16px',
+            fontSize: '0.85rem',
+            fontWeight: 500,
+            textAlign: 'center',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+            zIndex: 9999,
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+          }}
+        >
+          <span>⚠️</span>
+          <span>
+            <strong>Scheduled System Maintenance:</strong> {maintenance.message}
+          </span>
+        </div>
+      )}
       <nav className={styles.nav}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
           <button

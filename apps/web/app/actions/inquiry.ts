@@ -2,8 +2,21 @@
 
 import { prisma } from '../../lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { sendInquiryAcceptanceEmail, sendInquiryReceivedEmail } from '../../lib/email';
+import {
+  sendInquiryAcceptanceEmail,
+  sendInquiryReceivedEmail,
+  sendInquiryRejectionEmail,
+} from '../../lib/email';
 import { sendSmsNotification } from './sms';
+import { isEmailVerifiedRecently } from './otp';
+
+function safeRevalidate(path: string) {
+  try {
+    revalidatePath(path);
+  } catch (e) {
+    // Silently ignore when called in non-request contexts (tests, scripts)
+  }
+}
 
 export async function submitInquiry(data: {
   APP_ID: string;
@@ -18,6 +31,7 @@ export async function submitInquiry(data: {
   BURIAL_DATE?: string;
   TIME?: string;
   notes?: string;
+  skipVerification?: boolean;
 }) {
   try {
     // 1. Strict Validation
@@ -25,9 +39,18 @@ export async function submitInquiry(data: {
       return { success: false, message: 'Please fill in all required fields (Name, Email, Contact, Reason).' };
     }
 
-    const emailClean = data.email.trim();
+    const emailClean = data.email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailClean)) {
       return { success: false, message: 'Please provide a valid email address.' };
+    }
+
+    // 2. Email verification check
+    const isVerified = await isEmailVerifiedRecently(emailClean, 180); // 3 hours window
+    if (!isVerified && !data.skipVerification) {
+      return {
+        success: false,
+        message: 'Your email address must be verified before submitting. Please click "Verify Email" to get a 6-digit code.',
+      };
     }
 
     const record = await prisma.inquiries.create({
@@ -44,11 +67,13 @@ export async function submitInquiry(data: {
         BURIAL_DATE: data.BURIAL_DATE ? new Date(data.BURIAL_DATE) : null,
         TIME: data.TIME?.trim() || null,
         notes: data.notes?.trim() || null,
-        STATUS: "Pending",
-      }
+        STATUS: 'Pending',
+        emailVerified: isVerified || !!data.skipVerification,
+        emailVerifiedAt: (isVerified || data.skipVerification) ? new Date() : null,
+      },
     });
 
-    // 2. Dispatch immediate confirmation receipt email to the citizen
+    // 3. Dispatch immediate confirmation receipt email to the citizen
     try {
       const formattedDate = data.BURIAL_DATE
         ? new Date(data.BURIAL_DATE).toLocaleDateString('en-PH', {
@@ -59,6 +84,7 @@ export async function submitInquiry(data: {
         : null;
 
       await sendInquiryReceivedEmail({
+        inquiryId: record.id,
         appId: data.APP_ID,
         recipientName: data.FAMILY_NAME.trim(),
         recipientEmail: emailClean,
@@ -72,13 +98,13 @@ export async function submitInquiry(data: {
     } catch (emailErr) {
       console.warn('Initial receipt email dispatch warning:', emailErr);
     }
-    
+
     // Revalidate admin inquiries path
-    revalidatePath('/admin/inquiries');
-    
+    safeRevalidate('/admin/inquiries');
+
     return { success: true, record };
   } catch (error: any) {
-    console.error("Failed to submit inquiry:", error);
+    console.error('Failed to submit inquiry:', error);
     return { success: false, message: error.message || 'Failed to submit inquiry' };
   }
 }
@@ -86,11 +112,11 @@ export async function submitInquiry(data: {
 export async function getInquiries() {
   try {
     const records = await prisma.inquiries.findMany({
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
     return { success: true, records };
   } catch (error: any) {
-    console.error("Failed to fetch inquiries:", error);
+    console.error('Failed to fetch inquiries:', error);
     return { success: false, message: error.message || 'Failed to fetch inquiries' };
   }
 }
@@ -98,15 +124,14 @@ export async function getInquiries() {
 /**
  * Accepts/approves an inquiry:
  * 1. Validates the inquiry exists.
- * 2. Prevents duplicate emails/SMS if already accepted.
+ * 2. Prevents duplicate acceptance.
  * 3. Updates database status to 'Accepted'.
- * 4. Automatically sends acceptance email to user's stored email.
+ * 4. Automatically sends acceptance email to user's verified email.
  * 5. Automatically sends acceptance SMS to user's contact number.
- * 6. Returns status and message to the Admin UI.
+ * 6. Returns status, notification states, and friendly message to the Admin UI.
  */
 export async function acceptInquiry(id: number, remarks?: string) {
   try {
-    // 1. Fetch the inquiry
     const existing = await prisma.inquiries.findUnique({
       where: { id },
     });
@@ -115,7 +140,7 @@ export async function acceptInquiry(id: number, remarks?: string) {
       return { success: false, message: 'Inquiry not found.' };
     }
 
-    // 2. Prevent accidental duplicate actions & duplicate notifications
+    // Prevent duplicate actions
     if (existing.STATUS.toLowerCase() === 'accepted' || existing.STATUS.toLowerCase() === 'confirmed') {
       return {
         success: false,
@@ -128,7 +153,7 @@ export async function acceptInquiry(id: number, remarks?: string) {
       };
     }
 
-    // 3. Update status in database to 'Accepted'
+    // Update status in database to 'Accepted'
     const updatedRecord = await prisma.inquiries.update({
       where: { id },
       data: {
@@ -145,12 +170,13 @@ export async function acceptInquiry(id: number, remarks?: string) {
         })
       : null;
 
-    // 4. Send acceptance email to the user's Gmail/email address
+    // Send official acceptance email to the user's email address
     let emailSent = false;
     let emailError: string | undefined;
 
     if (existing.email && existing.email.trim()) {
       const emailResult = await sendInquiryAcceptanceEmail({
+        inquiryId: existing.id,
         appId: existing.APP_ID,
         recipientName: existing.FAMILY_NAME,
         recipientEmail: existing.email.trim(),
@@ -170,7 +196,7 @@ export async function acceptInquiry(id: number, remarks?: string) {
       emailError = 'No email address found for this inquiry record.';
     }
 
-    // 5. Send automated SMS Notification to citizen's contact number
+    // Send automated SMS Notification to citizen's contact number
     let smsSent = false;
     let smsError: string | undefined;
 
@@ -194,8 +220,8 @@ export async function acceptInquiry(id: number, remarks?: string) {
       }
     }
 
-    revalidatePath('/admin/inquiries');
-    revalidatePath('/admin/sms');
+    safeRevalidate('/admin/inquiries');
+    safeRevalidate('/admin/sms');
 
     const notifSummary = [];
     if (emailSent) notifSummary.push(`Email sent to ${existing.email}`);
@@ -211,47 +237,242 @@ export async function acceptInquiry(id: number, remarks?: string) {
       message: `Inquiry accepted successfully. ${notifSummary.length > 0 ? `(${notifSummary.join(', ')})` : ''}`,
     };
   } catch (error: any) {
-    console.error("Failed to accept inquiry:", error);
-    return { success: false, emailSent: false, smsSent: false, emailError: error.message, message: error.message || 'Failed to accept inquiry' };
+    console.error('Failed to accept inquiry:', error);
+    return {
+      success: false,
+      emailSent: false,
+      smsSent: false,
+      emailError: error.message,
+      message: error.message || 'Failed to accept inquiry',
+    };
   }
 }
 
-export async function updateInquiryStatus(id: number, status: string, remarks?: string) {
+/**
+ * Rejects an inquiry:
+ * 1. Validates the inquiry exists.
+ * 2. Updates database status to 'Rejected' with reason/remarks.
+ * 3. Sends rejection notification email with full details and office contact.
+ * 4. Sends rejection SMS if contact number is present.
+ */
+export async function rejectInquiry(id: number, reason?: string) {
   try {
-    // If status is being updated to Accepted, route through acceptInquiry for email & SMS handling
-    if (status.toLowerCase() === 'accepted' || status.toLowerCase() === 'confirmed') {
-      return await acceptInquiry(id, remarks);
-    }
-
-    const existing = await prisma.inquiries.findUnique({ where: { id } });
-
-    const record = await prisma.inquiries.update({
+    const existing = await prisma.inquiries.findUnique({
       where: { id },
-      data: { STATUS: status, remarks }
     });
 
-    // If status is Rejected, notify citizen via SMS
-    if (status.toLowerCase() === 'rejected' && existing?.CONTACT) {
-      const rejectSms = `Hi ${existing.FAMILY_NAME}, your inquiry (${existing.APP_ID}) was not approved. Contact the Jasaan Cemetery Office for assistance.`;
+    if (!existing) {
+      return { success: false, message: 'Inquiry not found.' };
+    }
+
+    if (existing.STATUS.toLowerCase() === 'rejected') {
+      return {
+        success: false,
+        message: `Inquiry ${existing.APP_ID} has already been marked as Rejected.`,
+        record: existing,
+      };
+    }
+
+    const updatedRecord = await prisma.inquiries.update({
+      where: { id },
+      data: {
+        STATUS: 'Rejected',
+        remarks: reason || existing.remarks,
+      },
+    });
+
+    let emailSent = false;
+    let emailError: string | undefined;
+
+    if (existing.email && existing.email.trim()) {
+      const emailResult = await sendInquiryRejectionEmail({
+        inquiryId: existing.id,
+        appId: existing.APP_ID,
+        recipientName: existing.FAMILY_NAME,
+        recipientEmail: existing.email.trim(),
+        requestType: existing.reason,
+        deceasedName: existing.DECEASED,
+        reason: reason || existing.remarks || 'Requirements not met or schedule conflict.',
+      });
+
+      emailSent = emailResult.success;
+      if (!emailResult.success) {
+        emailError = emailResult.error;
+      }
+    } else {
+      emailError = 'No email address found for this inquiry.';
+    }
+
+    // Send SMS
+    let smsSent = false;
+    let smsError: string | undefined;
+
+    if (existing.CONTACT && existing.CONTACT.trim()) {
+      const rejectSms = `Hi ${existing.FAMILY_NAME}, your inquiry (${existing.APP_ID}) was not approved${reason ? ': ' + reason : ''}. Contact Jasaan Cemetery Office for details.`;
       try {
-        await sendSmsNotification({
-          recipient: existing.CONTACT,
+        const smsResult = await sendSmsNotification({
+          recipient: existing.CONTACT.trim(),
           recipientName: existing.FAMILY_NAME,
           message: rejectSms,
           type: 'INQUIRY_REJECTED',
           sentBy: 'System Automation',
         });
-      } catch (smsErr) {
-        console.warn('Inquiry rejection SMS warning:', smsErr);
+        smsSent = smsResult.success;
+        if (!smsResult.success) smsError = smsResult.error;
+      } catch (smsErr: any) {
+        console.warn('Inquiry rejection SMS failed:', smsErr);
+        smsError = smsErr?.message;
       }
     }
 
-    revalidatePath('/admin/inquiries');
-    revalidatePath('/admin/sms');
+    safeRevalidate('/admin/inquiries');
+    safeRevalidate('/admin/sms');
+
+    return {
+      success: true,
+      emailSent,
+      smsSent,
+      emailError: emailError || undefined,
+      smsError: smsError || undefined,
+      record: updatedRecord,
+      message: `Inquiry rejected. ${emailSent ? `Email sent to ${existing.email}.` : ''}`,
+    };
+  } catch (error: any) {
+    console.error('Failed to reject inquiry:', error);
+    return {
+      success: false,
+      emailSent: false,
+      smsSent: false,
+      emailError: error.message,
+      message: error.message || 'Failed to reject inquiry',
+    };
+  }
+}
+
+/**
+ * Resends an acceptance, rejection, or receipt email for an inquiry.
+ */
+export async function resendInquiryEmail(id: number, type: 'acceptance' | 'rejection' | 'receipt') {
+  try {
+    const existing = await prisma.inquiries.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      return { success: false, message: 'Inquiry record not found.' };
+    }
+
+    if (!existing.email || !existing.email.trim()) {
+      return { success: false, message: 'No email address registered for this inquiry.' };
+    }
+
+    const formattedDate = existing.BURIAL_DATE
+      ? new Date(existing.BURIAL_DATE).toLocaleDateString('en-PH', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })
+      : null;
+
+    if (type === 'acceptance') {
+      const res = await sendInquiryAcceptanceEmail({
+        inquiryId: existing.id,
+        appId: existing.APP_ID,
+        recipientName: existing.FAMILY_NAME,
+        recipientEmail: existing.email.trim(),
+        deceasedName: existing.DECEASED,
+        requestType: existing.reason,
+        requestedPlot: existing.REQUESTED_PLOT,
+        burialDate: formattedDate,
+        burialTime: existing.TIME,
+        remarks: existing.remarks,
+      });
+
+      const isDevSimulated = res.messageId?.startsWith('dev-simulated-');
+
+      return {
+        success: res.success,
+        message: res.success
+          ? isDevSimulated
+            ? `[Dev Mode] Acceptance email simulated for ${existing.email}. (To receive in real Gmail, set 16-char Google App Password in .env).`
+            : `Acceptance email resent successfully to ${existing.email}.`
+          : `Failed to resend: ${res.error}`,
+      };
+    } else if (type === 'rejection') {
+      const res = await sendInquiryRejectionEmail({
+        inquiryId: existing.id,
+        appId: existing.APP_ID,
+        recipientName: existing.FAMILY_NAME,
+        recipientEmail: existing.email.trim(),
+        requestType: existing.reason,
+        deceasedName: existing.DECEASED,
+        reason: existing.remarks,
+      });
+
+      const isDevSimulated = res.messageId?.startsWith('dev-simulated-');
+
+      return {
+        success: res.success,
+        message: res.success
+          ? isDevSimulated
+            ? `[Dev Mode] Rejection email simulated for ${existing.email}. (To receive in real Gmail, set 16-char Google App Password in .env).`
+            : `Rejection email resent successfully to ${existing.email}.`
+          : `Failed to resend: ${res.error}`,
+      };
+    } else {
+      const res = await sendInquiryReceivedEmail({
+        inquiryId: existing.id,
+        appId: existing.APP_ID,
+        recipientName: existing.FAMILY_NAME,
+        recipientEmail: existing.email.trim(),
+        deceasedName: existing.DECEASED,
+        requestType: existing.reason,
+        requestedPlot: existing.REQUESTED_PLOT,
+        burialDate: formattedDate,
+        burialTime: existing.TIME,
+        remarks: existing.remarks,
+      });
+
+      const isDevSimulated = res.messageId?.startsWith('dev-simulated-');
+
+      return {
+        success: res.success,
+        message: res.success
+          ? isDevSimulated
+            ? `[Dev Mode] Receipt email simulated for ${existing.email}. (To receive in real Gmail, set 16-char Google App Password in .env).`
+            : `Receipt email resent successfully to ${existing.email}.`
+          : `Failed to resend: ${res.error}`,
+      };
+    }
+  } catch (error: any) {
+    console.error('Error resending inquiry email:', error);
+    return { success: false, message: error.message || 'Failed to resend email' };
+  }
+}
+
+export async function updateInquiryStatus(id: number, status: string, remarks?: string) {
+  try {
+    // If status is being updated to Accepted, route through acceptInquiry
+    if (status.toLowerCase() === 'accepted' || status.toLowerCase() === 'confirmed') {
+      return await acceptInquiry(id, remarks);
+    }
+
+    // If status is being updated to Rejected, route through rejectInquiry
+    if (status.toLowerCase() === 'rejected') {
+      return await rejectInquiry(id, remarks);
+    }
+
+    const record = await prisma.inquiries.update({
+      where: { id },
+      data: { STATUS: status, remarks },
+    });
+
+    safeRevalidate('/admin/inquiries');
     return { success: true, record, message: `Status updated to ${status}` };
   } catch (error: any) {
-    console.error("Failed to update inquiry:", error);
+    console.error('Failed to update inquiry:', error);
     return { success: false, message: error.message || 'Failed to update inquiry' };
   }
 }
+
 

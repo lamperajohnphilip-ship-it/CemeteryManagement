@@ -1,0 +1,263 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma-client"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Admin {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  password       String
+  name           String?
+  username       String?  @unique
+  contactNumber  String?
+  role           String   @default("Super Administrator")
+  avatar         String?  @db.Text
+  department     String?  @default("MEEDO - Municipal Environment & Natural Resources Office")
+  sessionTimeout Int      @default(60)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+}
+
+model DeceasedRecord {
+  id               String    @id @default(cuid())
+  REF_NO           String    @unique
+  PAYORS_NAME      String
+  CONTACT_NO       String
+  NAME_OF_DECEASED String
+  ADDRESS          String
+  DATE_OF_BIRTH    DateTime
+  DATE_OF_DEATH    DateTime
+  YEAR             Int
+  TOTAL_DUE        Float
+  PAID             Float
+  BALANCE          Float
+  STATUS           String
+  REMARKS          String?
+  isArchived       Boolean   @default(false)
+  archivedAt       DateTime?
+  archiveReason    String?
+
+  payments PaymentRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("deceased_records")
+}
+
+model PaymentRecord {
+  id               String    @id @default(cuid())
+  REF_NO           String    @unique
+  PAYORS_NAME      String
+  CONTACT_NO       String?
+  NAME_OF_DECEASED String
+  ADDRESS          String?
+  DATE_OF_BIRTH    DateTime?
+  DATE_OF_DEATH    DateTime?
+  YEAR             Int
+  TOTAL_DUE        Float     @default(0)
+  PAID             Float     @default(0)
+  BALANCE          Float     @default(0)
+  STATUS           String    @default("UNPAID")
+  REMARKS          String?
+
+  OR_NO     String?
+  DATE_PAID String?
+  METHOD    String? @default("Cash")
+  DUE_DATE  String?
+
+  deceasedRecordId String?
+  deceasedRecord   DeceasedRecord? @relation(fields: [deceasedRecordId], references: [id], onDelete: SetNull)
+
+  isArchived    Boolean   @default(false)
+  archivedAt    DateTime?
+  archiveReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("payment_records")
+}
+
+model Inquiries {
+  id             Int       @id @default(autoincrement())
+  APP_ID         String    @unique
+  FAMILY_NAME    String
+  DECEASED       String?
+  REQUESTED_PLOT String?
+  BURIAL_DATE    DateTime?
+  TIME           String?
+  CONTACT        String
+  STATUS         String    @default("Pending")
+
+  email           String
+  emailVerified   Boolean   @default(false)
+  emailVerifiedAt DateTime?
+  relationship    String
+  address         String?
+  reason          String
+  notes           String?
+  remarks         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  emailLogs EmailNotificationLog[]
+
+  @@map("inquiries")
+}
+
+model Announcement {
+  id         Int      @id @default(autoincrement())
+  title      String
+  content    String
+  category   String
+  badge      String?
+  visibility String
+  status     String   @default("active")
+  date       DateTime @default(now())
+  validFrom  String?
+  validUntil String?
+  views      Int      @default(0)
+
+  @@map("announcements")
+}
+
+model SmsNotification {
+  id            String   @id @default(cuid())
+  recipient     String
+  recipientName String?
+  message       String
+  semaphoreId   String?
+  status        String   @default("Pending") // 'Queued', 'Pending', 'Sent', 'Failed', 'Refunded'
+  type          String?  @default("CUSTOM") // 'INQUIRY_APPROVED', 'INQUIRY_REJECTED', 'PAYMENT_RECEIVED', 'PAYMENT_REMINDER', 'BURIAL_RECORDED', 'ANNOUNCEMENT', 'CUSTOM'
+  senderName    String?
+  sentBy        String? // Admin email, username, or 'SYSTEM'
+  errorMessage  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("sms_notifications")
+}
+
+model SystemSetting {
+  id String @id @default("default")
+
+  // 3. System Settings
+  systemName        String  @default("Eternal Rest - Cemetery Management System")
+  systemDescription String  @default("Web and Mobile-based Cemetery Management System for the Municipality of Jasaan")
+  systemLogo        String? @db.Text
+  contactNumber     String  @default("+63 88 888 0000")
+  officialEmail     String  @default("admin@jasaan.gov.ph")
+  officeAddress     String  @default("MEEDO Office, Municipal Hall, Jasaan, Misamis Oriental")
+  timeZone          String  @default("Asia/Manila")
+  dateFormat        String  @default("YYYY-MM-DD")
+  timeFormat        String  @default("12-hour")
+
+  // 4. Notification Settings
+  notifNewInquiry      Boolean @default(true)
+  notifInquiryAccepted Boolean @default(true)
+  notifInquiryRejected Boolean @default(true)
+  notifPayment         Boolean @default(true)
+  notifOverduePayment  Boolean @default(true)
+  notifAnnouncement    Boolean @default(true)
+  notifGraveLocator    Boolean @default(true)
+  notifSystem          Boolean @default(true)
+
+  // 5. SMS Settings
+  smsEnabled    Boolean @default(true)
+  smsProvider   String  @default("Semaphore")
+  smsSenderName String  @default("SEMAPHORE")
+
+  // 6. Email Settings
+  emailEnabled       Boolean @default(true)
+  emailSenderName    String  @default("Municipality of Jasaan Cemetery Management System")
+  emailSenderAddress String  @default("admin@jasaan.gov.ph")
+
+  // 7. User & Mobile Settings
+  userAccessEnabled    Boolean @default(true)
+  mobileAppEnabled     Boolean @default(true)
+  inquiriesEnabled     Boolean @default(true)
+  announcementsEnabled Boolean @default(true)
+  graveLocatorEnabled  Boolean @default(true)
+  maintenanceMode      Boolean @default(false)
+  maintenanceMessage   String  @default("The cemetery management portal is currently undergoing scheduled maintenance. Please check back shortly.")
+
+  // 8. Appearance
+  defaultTheme    String @default("dark")
+  sidebarBehavior String @default("expanded")
+  layoutDensity   String @default("normal")
+
+  // 9. System Preferences
+  itemsPerPage         Int    @default(25)
+  defaultDashboardPage String @default("/admin/cemetery-overview")
+  language             String @default("English")
+
+  // 10. Data & Backup
+  lastBackupAt      DateTime?
+  lastBackupFile    String?
+  backupStatus      String    @default("Ready")
+  autoBackupEnabled Boolean   @default(true)
+  backupFrequency   String    @default("Daily")
+
+  // 2. Account Security
+  sessionTimeout Int @default(60)
+
+  updatedAt DateTime @default(now()) @updatedAt
+  createdAt DateTime @default(now())
+
+  @@map("system_settings")
+}
+
+model AdminAuditLog {
+  id        String   @id @default(cuid())
+  activity  String
+  category  String // 'LOGIN', 'LOGOUT', 'SETTINGS_CHANGED', 'PASSWORD_CHANGED', 'NOTIFICATION_SETTINGS_CHANGED', 'SYSTEM_CONFIG_CHANGED', 'BACKUP'
+  admin     String // Admin email or name
+  status    String   @default("Success") // 'Success', 'Failed', 'Warning'
+  details   String?  @db.Text
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([category])
+  @@map("admin_audit_logs")
+}
+
+model EmailVerification {
+  id         String    @id @default(cuid())
+  email      String
+  codeHash   String
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email])
+  @@map("email_verifications")
+}
+
+model EmailNotificationLog {
+  id           String    @id @default(cuid())
+  inquiryId    Int?
+  inquiryAppId String?
+  recipient    String
+  emailType    String // 'Verification', 'Inquiry Accepted', 'Inquiry Rejected', 'Inquiry Received'
+  subject      String
+  status       String    @default("Pending") // 'Pending', 'Sent', 'Failed'
+  sentAt       DateTime?
+  errorMessage String?   @db.Text
+  createdAt    DateTime  @default(now())
+
+  inquiry Inquiries? @relation(fields: [inquiryId], references: [id], onDelete: SetNull)
+
+  @@index([recipient])
+  @@index([inquiryId])
+  @@map("email_notification_logs")
+}

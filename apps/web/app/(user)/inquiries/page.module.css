@@ -306,6 +306,9 @@
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .btnSendOtp:hover:not(:disabled) {
@@ -318,6 +321,296 @@
 .btnSendOtp:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* ─── Google Sign-In & Email Security Styles ──────────────────── */
+
+.googleAuthBox {
+  margin-bottom: 1.2rem;
+}
+
+.googleSignInWrap {
+  background: rgba(30, 26, 20, 0.7);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  border-radius: 10px;
+  padding: 1.2rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  backdrop-filter: blur(8px);
+  transition: border-color 0.25s;
+}
+
+.googleSignInWrap:hover {
+  border-color: rgba(201, 168, 76, 0.45);
+}
+
+.googleBadge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  color: #f5eedc;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.googleAuthDesc {
+  font-size: 0.82rem;
+  color: rgba(232, 224, 208, 0.65);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.btnGoogleMain {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #ffffff;
+  color: #3c4043;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  padding: 0.75rem 1.4rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  align-self: flex-start;
+}
+
+.btnGoogleMain:hover:not(:disabled) {
+  background: #f8f9fa;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.btnGoogleMain:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btnGoogleField {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  color: #3c4043;
+  border: 1px solid #dadce0;
+  border-radius: 6px;
+  padding: 0.85rem 1.1rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.btnGoogleField:hover:not(:disabled) {
+  background: #f8f9fa;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+}
+
+.btnGoogleField:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.googleVerifiedCard {
+  background: rgba(22, 34, 24, 0.85);
+  border: 1px solid rgba(74, 222, 128, 0.4);
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  animation: slideDown 0.3s ease;
+}
+
+.googleVerifiedLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.googleVerifiedStatus {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #86efac;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.googleVerifiedEmail {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 0.88rem;
+  color: #f5eedc;
+  margin-top: 2px;
+}
+
+.btnChangeGoogleAccount {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(232, 224, 208, 0.25);
+  border-radius: 6px;
+  padding: 0.45rem 0.85rem;
+  color: rgba(232, 224, 208, 0.8);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btnChangeGoogleAccount:hover {
+  background: rgba(201, 168, 76, 0.15);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+/* Google Sign In Modal */
+.googleModalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+  animation: fadeIn 0.2s ease;
+}
+
+.googleModal {
+  background: #1f1d19;
+  border: 1px solid rgba(201, 168, 76, 0.4);
+  border-radius: 14px;
+  max-width: 440px;
+  width: 100%;
+  padding: 1.8rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes scaleUp {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.googleModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.15);
+  padding-bottom: 0.8rem;
+}
+
+.googleModalTitle {
+  font-family: 'Cinzel', serif;
+  font-size: 1.2rem;
+  color: var(--cream);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.googleModalClose {
+  background: transparent;
+  border: none;
+  color: rgba(232, 224, 208, 0.5);
+  font-size: 1.4rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.googleModalClose:hover {
+  color: #ffffff;
+}
+
+.googleAccountCard {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.googleAccountCard:hover {
+  background: rgba(201, 168, 76, 0.1);
+  border-color: var(--gold);
+}
+
+.googleAccountAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #4285F4;
+  color: #ffffff;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+}
+
+.googleAccountInfo {
+  flex: 1;
+  text-align: left;
+}
+
+.googleAccountName {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #f5eedc;
+}
+
+.googleAccountEmail {
+  font-size: 0.76rem;
+  color: rgba(232, 224, 208, 0.6);
+}
+
+.btnSubmitGoogleModal {
+  background: linear-gradient(135deg, var(--gold), var(--gold-dim));
+  border: none;
+  border-radius: 6px;
+  padding: 0.85rem 1rem;
+  color: #1a1814;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.btnSubmitGoogleModal:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(201, 168, 76, 0.35);
 }
 
 .emailVerifiedBadge {

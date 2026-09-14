@@ -13,16 +13,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const router = useRouter();
 
+  const [adminProfile, setAdminProfile] = useState<{ name?: string; role?: string; avatar?: string } | null>(null);
+
   const toggleSidebar = () => setCollapsed(!collapsed);
   const toggleMobile = () => setMobileOpen(!mobileOpen);
 
-  // ── Auth guard ──────────────────────────────────────────
+  // ── Auth guard & Session Timeout ─────────────────────────
   const checkAuth = useCallback(() => {
     const session = localStorage.getItem('adminProfile');
     if (!session) {
       router.replace('/admin-log');
       return false;
     }
+    try {
+      setAdminProfile(JSON.parse(session));
+    } catch (e) {}
     return true;
   }, [router]);
 
@@ -35,6 +40,32 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (!checkAuth()) return;
     setAuthChecked(true);
 
+    // Inactivity timeout handler
+    let timeoutMinutes = 60;
+    try {
+      const stored = localStorage.getItem('adminProfile');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.sessionTimeout) timeoutMinutes = Number(parsed.sessionTimeout);
+      }
+    } catch (e) {}
+
+    let lastActivity = Date.now();
+    const updateActivity = () => {
+      lastActivity = Date.now();
+    };
+
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - lastActivity;
+      if (elapsed > timeoutMinutes * 60 * 1000) {
+        localStorage.removeItem('adminProfile');
+        router.replace('/admin-log');
+      }
+    }, 30000);
+
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
+    events.forEach((ev) => window.addEventListener(ev, updateActivity, { passive: true }));
+
     // Catch browser Back button after logout
     const handlePopState = () => {
       if (!localStorage.getItem('adminProfile')) {
@@ -42,8 +73,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       }
     };
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [checkAuth]);
+    return () => {
+      clearInterval(interval);
+      events.forEach((ev) => window.removeEventListener(ev, updateActivity));
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [checkAuth, router]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -123,10 +158,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
           )}
           <div className={styles.sbProfile} onClick={() => setShowLogout(!showLogout)}>
-            <div className={styles.sbAvatar}>JA</div>
+            <div className={styles.sbAvatar}>
+              {adminProfile?.name
+                ? adminProfile.name
+                    .split(' ')
+                    .map((n) => n[0])
+                    .slice(0, 2)
+                    .join('')
+                    .toUpperCase()
+                : 'AD'}
+            </div>
             <div className={styles.sbPinfo}>
-              <p>Admin Jasaan</p>
-              <span>Super Administrator</span>
+              <p>{adminProfile?.name || 'Admin Jasaan'}</p>
+              <span>{adminProfile?.role || 'Super Administrator'}</span>
             </div>
           </div>
         </div>

@@ -32,14 +32,14 @@ export default function InquiryPage() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [refNum, setRefNum] = useState('');
 
-  // Email Verification States (Anti-Scam & Security)
+  // Email OTP Verification States
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
-  const [otpMessage, setOtpMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [otpMessage, setOtpMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   // Feedback Modal States
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -66,19 +66,45 @@ export default function InquiryPage() {
     5: '5/5 · Excellent & Fast!'
   };
 
+  // Cooldown countdown timer for OTP resend
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setResendCooldown(prev => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldown]);
+
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0] || '';
     const dateInput = document.getElementById('f-date') as HTMLInputElement;
     if (dateInput) dateInput.min = today;
-  }, []);
 
-  // Resend countdown timer
-  useEffect(() => {
-    if (resendCooldown > 0) {
-      const timer = setTimeout(() => setResendCooldown(prev => prev - 1), 1000);
-      return () => clearTimeout(timer);
+    // Handle One-Click Secure Verification Link redirect (?email=...&verified=true)
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const verifiedParam = params.get('verified');
+      const emailParam = params.get('email');
+      const errorParam = params.get('error');
+
+      if (verifiedParam === 'true' && emailParam) {
+        setFormData(prev => ({ ...prev, email: emailParam }));
+        setIsEmailVerified(true);
+        setOtpSent(false);
+        setOtpMessage({
+          text: '✅ Email verified successfully via your secure link! You can now proceed with your inquiry.',
+          type: 'success'
+        });
+        setErrors(prev => ({ ...prev, email: false, emailNotVerified: false }));
+        // Clean URL cleanly without triggering a reload
+        window.history.replaceState({}, '', window.location.pathname);
+      } else if (errorParam) {
+        if (emailParam) setFormData(prev => ({ ...prev, email: emailParam }));
+        setOtpMessage({ text: decodeURIComponent(errorParam), type: 'error' });
+        window.history.replaceState({}, '', window.location.pathname);
+      }
     }
-  }, [resendCooldown]);
+  }, []);
 
   const handleInputChange = (field: string, value: string | boolean) => {
     if (field === 'email') {
@@ -88,72 +114,82 @@ export default function InquiryPage() {
       setOtpCode('');
       setOtpMessage(null);
     }
-    setFormData({ ...formData, [field]: value });
-    setErrors({ ...errors, [field]: false, emailNotVerified: false });
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setErrors(prev => ({ ...prev, [field]: false, emailNotVerified: false }));
   };
 
-  // --- Email OTP Handlers ---
+  // --- Email OTP Verification Handlers ---
   const handleSendOtp = async () => {
     const email = formData.email.trim();
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setErrors(prev => ({ ...prev, email: true }));
-      setOtpMessage({ text: 'Please enter a valid Gmail / email address first.', type: 'error' });
+      setOtpMessage({ text: 'Please enter a valid email address first.', type: 'error' });
       return;
     }
 
     setIsSendingOtp(true);
-    setOtpMessage({ text: 'Sending 6-digit verification code to your Gmail...', type: 'info' });
+    setOtpMessage({ text: 'Sending 6-digit verification code to your Gmail…', type: 'info' });
 
     try {
-      const fullName = `${formData.firstName} ${formData.lastName}`.trim();
-      const res = await sendEmailOtp(email, fullName);
+      const applicantName = `${formData.firstName} ${formData.lastName}`.trim() || undefined;
+      const res = await sendEmailOtp(email, applicantName);
 
       if (res.success) {
         setOtpSent(true);
-        setResendCooldown(60);
-
-        // If email credentials aren't configured yet, auto-fill the code for testing
-        if ((res as any).devFallback && (res as any).debugCode) {
-          setOtpCode((res as any).debugCode);
-          setOtpMessage({
-            text: `⚠️ Gmail SMTP not configured yet. Your verification code is: ${(res as any).debugCode} (auto-filled for testing). To enable real email delivery, set EMAIL_USER and EMAIL_APP_PASSWORD in your .env file.`,
-            type: 'info'
-          });
-        } else {
-          setOtpMessage({ text: res.message, type: 'success' });
-        }
+        setResendCooldown(45);
+        setOtpMessage({
+          text: res.message || `A 6-digit verification code has been sent to ${email}. Check your inbox and spam folder.`,
+          type: 'success'
+        });
       } else {
-        setOtpMessage({ text: res.message || 'Failed to send verification code.', type: 'error' });
+        setOtpMessage({
+          text: res.message || 'Failed to send verification code. Please check your email.',
+          type: 'error'
+        });
       }
-    } catch (e: any) {
-      setOtpMessage({ text: e.message || 'Failed to send verification code.', type: 'error' });
+    } catch (err: any) {
+      setOtpMessage({
+        text: err.message || 'Error communicating with verification service.',
+        type: 'error'
+      });
     } finally {
       setIsSendingOtp(false);
     }
   };
 
   const handleVerifyOtp = async () => {
-    if (!otpCode || otpCode.trim().length < 4) {
-      setOtpMessage({ text: 'Please enter the 6-digit verification code sent to your email.', type: 'error' });
+    const email = formData.email.trim();
+    const cleanCode = otpCode.trim().replace(/\s+/g, '');
+
+    if (!cleanCode || cleanCode.length !== 6) {
+      setOtpMessage({ text: 'Please enter the 6-digit verification code.', type: 'error' });
       return;
     }
 
     setIsVerifyingOtp(true);
-    setOtpMessage({ text: 'Verifying code...', type: 'info' });
+    setOtpMessage({ text: 'Verifying code…', type: 'info' });
 
     try {
-      const res = await verifyEmailOtp(formData.email.trim(), otpCode.trim());
+      const res = await verifyEmailOtp(email, cleanCode);
 
       if (res.success) {
         setIsEmailVerified(true);
-        setOtpSent(false);
-        setOtpMessage({ text: '✅ Email verified successfully! You can now proceed with your inquiry.', type: 'success' });
+        setOtpMessage({
+          text: '✅ Email verified successfully! You can now proceed with your inquiry.',
+          type: 'success'
+        });
         setErrors(prev => ({ ...prev, email: false, emailNotVerified: false }));
       } else {
-        setOtpMessage({ text: res.message || 'Incorrect verification code. Please try again.', type: 'error' });
+        setOtpMessage({
+          text: res.message || 'Incorrect verification code. Please try again.',
+          type: 'error'
+        });
       }
-    } catch (e: any) {
-      setOtpMessage({ text: e.message || 'Verification failed.', type: 'error' });
+    } catch (err: any) {
+      setOtpMessage({
+        text: err.message || 'Error verifying code. Please try again.',
+        type: 'error'
+      });
     } finally {
       setIsVerifyingOtp(false);
     }
@@ -204,14 +240,22 @@ export default function InquiryPage() {
     }
   };
 
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   const handleFinalSubmit = async () => {
+    setSubmitError(null);
+
+    if (!isEmailVerified) {
+      setSubmitError('Your email address must be verified before submitting. Please return to Step 1 and verify your email.');
+      setStep(1);
+      return;
+    }
+
     setIsSubmitting(true);
-    
     const ref = 'APP-' + Date.now().toString().slice(-6);
-    setRefNum(ref);
 
     try {
-      await submitInquiry({
+      const res = await submitInquiry({
         APP_ID: ref,
         FAMILY_NAME: formData.firstName.trim() + ' ' + formData.lastName.trim(),
         email: formData.email.trim(),
@@ -225,8 +269,19 @@ export default function InquiryPage() {
         TIME: formData.preferredTime,
         notes: formData.notes.trim()
       });
-    } catch (e) {
+
+      if (!res.success) {
+        setIsSubmitting(false);
+        setSubmitError(res.message || 'Failed to submit inquiry. Please verify your details.');
+        return;
+      }
+
+      setRefNum(ref);
+    } catch (e: any) {
       console.error("Failed to submit inquiry to db", e);
+      setIsSubmitting(false);
+      setSubmitError(e?.message || 'A network error occurred while submitting.');
+      return;
     }
     
     // Update local notifications so the admin bell icon works
@@ -495,8 +550,8 @@ export default function InquiryPage() {
           <div className={styles.stepItem}>
             <div className={styles.stepNum}>1</div>
             <div>
-              <div className={styles.stepTitle}>PERSONAL & EMAIL VERIFICATION</div>
-              <div className={styles.stepDesc}>Provide your details and verify your Gmail address with a secure code.</div>
+              <div className={styles.stepTitle}>PERSONAL & GOOGLE VERIFICATION</div>
+              <div className={styles.stepDesc}>Provide your details and verify your identity securely with Google.</div>
             </div>
           </div>
           <div className={styles.stepItem}>
@@ -547,6 +602,9 @@ export default function InquiryPage() {
             <div className={styles.sectionBadge}><div className={styles.sectionBadgeNum}>1</div> PERSONAL INFORMATION</div>
             <div className={styles.sectionHeading}>Your Details</div>
             <div className={styles.sectionSubheading}>Provide your verified details so the cemetery office can send your booking confirmation.</div>
+
+
+
             <div className={styles.formCard}>
               <div className={styles.formGrid}>
                 <div className={styles.formRow2}>
@@ -562,11 +620,11 @@ export default function InquiryPage() {
                   </div>
                 </div>
 
-                {/* Email Address with Anti-Scam Security Verification */}
+                {/* Email Address with Real Gmail OTP Verification */}
                 <div className={styles.formGroup}>
                   <label className={styles.formLabel}>
                     Email Address (Gmail / Personal Email) <span className={styles.req}>*</span>
-                    {isEmailVerified && <span style={{ color: '#86efac', marginLeft: 'auto', fontWeight: 'bold' }}>✓ Verified</span>}
+                    {isEmailVerified && <span style={{ color: '#86efac', marginLeft: 'auto', fontWeight: 'bold' }}>✓ Email Verified</span>}
                   </label>
                   
                   <div className={styles.emailInputWrap}>
@@ -586,7 +644,15 @@ export default function InquiryPage() {
                         onClick={handleSendOtp}
                         disabled={isSendingOtp || !formData.email || resendCooldown > 0}
                       >
-                        {isSendingOtp ? 'Sending…' : resendCooldown > 0 ? `Wait (${resendCooldown}s)` : 'Verify Email'}
+                        {isSendingOtp ? (
+                          <><svg className={styles.spin} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" /></svg> Sending…</>
+                        ) : resendCooldown > 0 ? (
+                          `Wait (${resendCooldown}s)`
+                        ) : otpSent ? (
+                          'Resend Code'
+                        ) : (
+                          'Verify Email'
+                        )}
                       </button>
                     ) : (
                       <div className={styles.emailVerifiedBadge}>
@@ -600,7 +666,7 @@ export default function InquiryPage() {
 
                   {isEmailVerified && (
                     <button type="button" className={styles.btnChangeEmail} onClick={handleChangeEmail}>
-                      Use a different email address
+                      Change email address
                     </button>
                   )}
 
@@ -611,20 +677,32 @@ export default function InquiryPage() {
                         <span>✉️ Enter 6-Digit Code Sent to {formData.email}</span>
                       </div>
                       
+                      <p style={{ margin: '0 0 10px 0', fontSize: '0.78rem', color: 'rgba(232, 224, 208, 0.7)', lineHeight: 1.4 }}>
+                        Check your Gmail inbox (or spam folder) for the 6-digit code, or click the one-click link inside the email to verify instantly.
+                      </p>
+
                       <div className={styles.otpInputsRow}>
                         <input
                           className={styles.otpInput}
                           type="text"
+                          inputMode="numeric"
                           maxLength={6}
                           placeholder="123456"
                           value={otpCode}
                           onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && otpCode.length === 6) {
+                              e.preventDefault();
+                              handleVerifyOtp();
+                            }
+                          }}
+                          autoFocus
                         />
                         <button
                           type="button"
                           className={styles.btnVerifyOtp}
                           onClick={handleVerifyOtp}
-                          disabled={isVerifyingOtp || otpCode.length < 4}
+                          disabled={isVerifyingOtp || otpCode.length !== 6}
                         >
                           {isVerifyingOtp ? 'Checking…' : 'Confirm Code'}
                         </button>
@@ -639,10 +717,10 @@ export default function InquiryPage() {
                       <div className={styles.otpResendText}>
                         <span>Didn't receive code? Check spam folder.</span>
                         {resendCooldown > 0 ? (
-                          <span>Resend in {resendCooldown}s</span>
+                          <span>Resend available in {resendCooldown}s</span>
                         ) : (
                           <button type="button" className={styles.btnResendCode} onClick={handleSendOtp} disabled={isSendingOtp}>
-                            Resend Code
+                            Resend Code Now
                           </button>
                         )}
                       </div>
@@ -652,7 +730,13 @@ export default function InquiryPage() {
                   {errors.email && <div className={styles.errMsg} style={{ display: 'block' }}>Please enter a valid email address.</div>}
                   {errors.emailNotVerified && !isEmailVerified && (
                     <div className={styles.errMsg} style={{ display: 'block', color: '#f87171' }}>
-                      ⚠️ Please click <strong>"Verify Email"</strong> and enter the 6-digit code to protect against fake/scam submissions.
+                      ⚠️ Please click <strong>"Verify Email"</strong> and enter the 6-digit code sent to your Gmail to verify your identity.
+                    </div>
+                  )}
+
+                  {otpMessage && (!otpSent || isEmailVerified) && (
+                    <div className={`${styles.otpStatusMsg} ${otpMessage.type === 'success' ? styles.otpStatusSuccess : otpMessage.type === 'error' ? styles.otpStatusError : styles.otpStatusInfo}`} style={{ marginTop: '0.6rem' }}>
+                      {otpMessage.text}
                     </div>
                   )}
                 </div>
@@ -794,6 +878,12 @@ export default function InquiryPage() {
                 <div className={styles.reviewRow}><div className={styles.reviewKey}>Notes</div><div className={styles.reviewVal} style={{ fontSize: '0.8rem' }}>{formData.notes || 'None'}</div></div>
               </div>
             </div>
+            {submitError && (
+              <div style={{ margin: '16px 0', padding: '12px 16px', backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '8px', color: '#fca5a5', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>⚠️</span>
+                <span>{submitError}</span>
+              </div>
+            )}
             <div className={styles.formNav}>
               <button className={styles.btnPrev} disabled={isSubmitting} onClick={() => setStep(2)}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 5l-7 7 7 7" /></svg> Back to Inquiry Details</button>
               <button className={styles.btnSubmit} disabled={isSubmitting} onClick={handleFinalSubmit}>
@@ -806,6 +896,8 @@ export default function InquiryPage() {
             </div>
           </div>
         )}
+
+
       </div>
     </div>
   );

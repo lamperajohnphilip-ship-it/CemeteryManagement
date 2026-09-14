@@ -1,0 +1,13 @@
+{
+  "APP_ID": "APP-987654",
+  "FAMILY_NAME": "Maria Santos",
+  "email": "test_api_citizen@gmail.com",
+  "CONTACT": "0917-123-4567",
+  "relationship": "Child / Son / Daughter",
+  "reason": "Burial Scheduling & Plot Inquiry",
+  "DECEASED": "Pedro Santos",
+  "REQUESTED_PLOT": "Block A, Lot 10",
+  "BURIAL_DATE": "2026-09-20",
+  "TIME": "10:00 AM – 11:00 AM",
+  "notes": "Official verification test submission"
+}

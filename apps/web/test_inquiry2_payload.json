@@ -1,0 +1,13 @@
+{
+  "APP_ID": "APP-112233",
+  "FAMILY_NAME": "Roberto Reyes",
+  "email": "test_api_citizen@gmail.com",
+  "CONTACT": "0918-987-6543",
+  "relationship": "Sibling",
+  "reason": "Grave Reservation",
+  "DECEASED": "Elena Reyes",
+  "REQUESTED_PLOT": "Section C, Row 2",
+  "BURIAL_DATE": "2026-10-01",
+  "TIME": "1:00 PM – 2:00 PM",
+  "notes": "Testing rejection flow"
+}
