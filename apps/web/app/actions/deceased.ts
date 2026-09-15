@@ -2,12 +2,13 @@
 
 import { prisma } from '../../lib/prisma';
 import { revalidatePath } from 'next/cache';
+import { requireAdmin, requireRole } from '../../lib/auth';
 
 // Helper for status calculation
 function calculateStatusAndBalance(totalDue: number, paid: number) {
   const balance = Math.max(0, totalDue - paid);
   let status = 'UNPAID';
-  
+
   if (balance === 0 && totalDue > 0) {
     status = 'PAID';
   } else if (balance === 0 && totalDue === 0 && paid > 0) {
@@ -17,7 +18,7 @@ function calculateStatusAndBalance(totalDue: number, paid: number) {
   } else if (paid === 0) {
     status = 'UNPAID';
   }
-  
+
   return { balance, status };
 }
 
@@ -27,10 +28,10 @@ async function generateRefNo() {
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const dd = String(date.getDate()).padStart(2, '0');
-  
+
   const randomStr = Math.floor(1000 + Math.random() * 9000).toString();
   let refNo = `REF-${yyyy}${mm}${dd}-${randomStr}`;
-  
+
   let exists = await prisma.deceasedRecord.findUnique({ where: { REF_NO: refNo } });
   while (exists) {
     const newRandom = Math.floor(1000 + Math.random() * 9000).toString();
@@ -53,45 +54,79 @@ export async function addDeceasedRecord(data: {
   REMARKS?: string;
 }) {
   try {
+    const admin = await requireAdmin();
+
     // 1. Validation
     if (!data.PAYORS_NAME || !data.CONTACT_NO || !data.NAME_OF_DECEASED || !data.ADDRESS) {
-      throw new Error("Missing required string fields.");
+      throw new Error('Missing required string fields.');
     }
     if (!data.DATE_OF_BIRTH || !data.DATE_OF_DEATH) {
-      throw new Error("Missing dates.");
+      throw new Error('Missing birth or death dates.');
     }
-    
+
     const totalDue = parseFloat(data.TOTAL_DUE as any) || 0;
     const paid = parseFloat(data.PAID as any) || 0;
     const year = parseInt(data.YEAR as any) || new Date().getFullYear();
 
     if (totalDue < 0 || paid < 0) {
-      throw new Error("Payments cannot be negative.");
+      throw new Error('Payments cannot be negative numbers.');
+    }
+
+    if (paid > totalDue && totalDue > 0) {
+      throw new Error('Initial payment amount cannot exceed total amount due.');
     }
 
     // 2. Calculations
     const { balance, status } = calculateStatusAndBalance(totalDue, paid);
-    
+
     // 3. Generate REF_NO
     const refNo = await generateRefNo();
 
-    // 4. Insert into database
-    const record = await prisma.deceasedRecord.create({
-      data: {
-        REF_NO: refNo,
-        PAYORS_NAME: data.PAYORS_NAME,
-        CONTACT_NO: data.CONTACT_NO,
-        NAME_OF_DECEASED: data.NAME_OF_DECEASED,
-        ADDRESS: data.ADDRESS,
-        DATE_OF_BIRTH: new Date(data.DATE_OF_BIRTH),
-        DATE_OF_DEATH: new Date(data.DATE_OF_DEATH),
-        YEAR: year,
-        TOTAL_DUE: totalDue,
-        PAID: paid,
-        BALANCE: balance,
-        STATUS: status,
-        REMARKS: data.REMARKS || null,
+    // 4. Atomic Database Transaction: Insert DeceasedRecord AND initial PaymentRecord if paid > 0
+    const record = await prisma.$transaction(async (tx) => {
+      const decRecord = await tx.deceasedRecord.create({
+        data: {
+          REF_NO: refNo,
+          PAYORS_NAME: data.PAYORS_NAME.trim(),
+          CONTACT_NO: data.CONTACT_NO.trim(),
+          NAME_OF_DECEASED: data.NAME_OF_DECEASED.trim(),
+          ADDRESS: data.ADDRESS.trim(),
+          DATE_OF_BIRTH: new Date(data.DATE_OF_BIRTH),
+          DATE_OF_DEATH: new Date(data.DATE_OF_DEATH),
+          YEAR: year,
+          TOTAL_DUE: totalDue,
+          PAID: paid,
+          BALANCE: balance,
+          STATUS: status,
+          REMARKS: data.REMARKS ? data.REMARKS.trim() : null,
+        },
+      });
+
+      if (paid > 0) {
+        const paymentRef = `PAY-${refNo.replace(/^REF-/, '')}`;
+        await tx.paymentRecord.create({
+          data: {
+            REF_NO: paymentRef,
+            PAYORS_NAME: data.PAYORS_NAME.trim(),
+            CONTACT_NO: data.CONTACT_NO.trim(),
+            NAME_OF_DECEASED: data.NAME_OF_DECEASED.trim(),
+            ADDRESS: data.ADDRESS.trim(),
+            DATE_OF_BIRTH: new Date(data.DATE_OF_BIRTH),
+            DATE_OF_DEATH: new Date(data.DATE_OF_DEATH),
+            YEAR: year,
+            TOTAL_DUE: totalDue,
+            PAID: paid,
+            BALANCE: balance,
+            STATUS: status,
+            REMARKS: data.REMARKS || 'Initial burial registration payment',
+            METHOD: 'Cash',
+            DATE_PAID: new Date().toISOString().split('T')[0],
+            deceasedRecordId: decRecord.id,
+          },
+        });
       }
+
+      return decRecord;
     });
 
     // Dispatch automated SMS confirmation to contact number
@@ -104,73 +139,78 @@ export async function addDeceasedRecord(data: {
           recipientName: data.PAYORS_NAME,
           message: burialSms,
           type: 'BURIAL_RECORDED',
-          sentBy: 'System Automation',
+          sentBy: admin.name || 'System Administrator',
         });
       } catch (smsErr) {
         console.warn('Burial confirmation SMS warning:', smsErr);
       }
     }
 
-    revalidatePath('/admin/inventory');
     revalidatePath('/admin/deceased-information');
     revalidatePath('/admin/payment-records');
+    revalidatePath('/admin/cemetery-overview');
     revalidatePath('/admin/sms');
     return { success: true, record };
   } catch (error: any) {
-    console.error("Error adding deceased record:", error);
-    return { success: false, error: error.message };
+    console.error('Error adding deceased record:', error);
+    return { success: false, error: error.message || 'Failed to create deceased record.' };
   }
 }
 
 export async function getDeceasedRecords() {
   try {
+    await requireAdmin();
     const records = await prisma.deceasedRecord.findMany({
-      // Use NOT: { isArchived: true } instead of { isArchived: false }
-      // so that manually inserted rows with isArchived = NULL are also included
       where: { NOT: { isArchived: true } },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
     return { success: true, records };
   } catch (error: any) {
-    console.error("Error fetching deceased records:", error);
+    console.error('Error fetching deceased records:', error);
     return { success: false, error: error.message };
   }
 }
 
 export async function getArchivedRecords() {
   try {
+    await requireAdmin();
     const records = await prisma.deceasedRecord.findMany({
       where: { isArchived: true },
-      orderBy: { archivedAt: 'desc' }
+      orderBy: { archivedAt: 'desc' },
     });
     return { success: true, records };
   } catch (error: any) {
-    console.error("Error fetching archived records:", error);
+    console.error('Error fetching archived records:', error);
     return { success: false, error: error.message };
   }
 }
 
-export async function updateDeceasedRecord(id: string, data: Partial<{
-  PAYORS_NAME: string;
-  CONTACT_NO: string;
-  NAME_OF_DECEASED: string;
-  ADDRESS: string;
-  DATE_OF_BIRTH: string;
-  DATE_OF_DEATH: string;
-  YEAR: number;
-  TOTAL_DUE: number;
-  PAID: number;
-  REMARKS: string;
-}>) {
+export async function updateDeceasedRecord(
+  id: string,
+  data: Partial<{
+    PAYORS_NAME: string;
+    CONTACT_NO: string;
+    NAME_OF_DECEASED: string;
+    ADDRESS: string;
+    DATE_OF_BIRTH: string;
+    DATE_OF_DEATH: string;
+    YEAR: number;
+    TOTAL_DUE: number;
+    PAID: number;
+    REMARKS: string;
+  }>
+) {
   try {
+    await requireAdmin();
+
     const existing = await prisma.deceasedRecord.findUnique({ where: { id } });
-    if (!existing) throw new Error("Record not found");
+    if (!existing) throw new Error('Record not found');
 
     const totalDue = data.TOTAL_DUE !== undefined ? parseFloat(data.TOTAL_DUE as any) : existing.TOTAL_DUE;
     const paid = data.PAID !== undefined ? parseFloat(data.PAID as any) : existing.PAID;
-    
+
     if (totalDue < 0 || paid < 0) {
-      throw new Error("Payments cannot be negative.");
+      throw new Error('Payments cannot be negative.');
     }
 
     const { balance, status } = calculateStatusAndBalance(totalDue, paid);
@@ -182,104 +222,109 @@ export async function updateDeceasedRecord(id: string, data: Partial<{
       STATUS: status,
     };
 
-    if (data.PAYORS_NAME !== undefined) updateData.PAYORS_NAME = data.PAYORS_NAME;
-    if (data.CONTACT_NO !== undefined) updateData.CONTACT_NO = data.CONTACT_NO;
-    if (data.NAME_OF_DECEASED !== undefined) updateData.NAME_OF_DECEASED = data.NAME_OF_DECEASED;
-    if (data.ADDRESS !== undefined) updateData.ADDRESS = data.ADDRESS;
+    if (data.PAYORS_NAME !== undefined) updateData.PAYORS_NAME = data.PAYORS_NAME.trim();
+    if (data.CONTACT_NO !== undefined) updateData.CONTACT_NO = data.CONTACT_NO.trim();
+    if (data.NAME_OF_DECEASED !== undefined) updateData.NAME_OF_DECEASED = data.NAME_OF_DECEASED.trim();
+    if (data.ADDRESS !== undefined) updateData.ADDRESS = data.ADDRESS.trim();
     if (data.DATE_OF_BIRTH !== undefined) updateData.DATE_OF_BIRTH = new Date(data.DATE_OF_BIRTH);
     if (data.DATE_OF_DEATH !== undefined) updateData.DATE_OF_DEATH = new Date(data.DATE_OF_DEATH);
     if (data.YEAR !== undefined) updateData.YEAR = parseInt(data.YEAR as any);
-    if (data.REMARKS !== undefined) updateData.REMARKS = data.REMARKS;
+    if (data.REMARKS !== undefined) updateData.REMARKS = data.REMARKS.trim();
 
     const record = await prisma.deceasedRecord.update({
       where: { id },
       data: updateData,
     });
 
-    revalidatePath('/admin/inventory');
     revalidatePath('/admin/deceased-information');
     revalidatePath('/admin/payment-records');
+    revalidatePath('/admin/cemetery-overview');
     return { success: true, record };
   } catch (error: any) {
-    console.error("Error updating deceased record:", error);
+    console.error('Error updating deceased record:', error);
     return { success: false, error: error.message };
   }
 }
 
 export async function archiveDeceasedRecord(id: string, reason?: string) {
   try {
+    await requireAdmin();
+
     await prisma.deceasedRecord.update({
       where: { id },
       data: {
         isArchived: true,
         archivedAt: new Date(),
-        archiveReason: reason || null,
-      }
+        archiveReason: reason ? reason.trim() : null,
+      },
     });
-    revalidatePath('/admin/inventory');
+
     revalidatePath('/admin/deceased-information');
     revalidatePath('/admin/archive');
-    revalidatePath('/admin/archieve');
     revalidatePath('/admin/payment-records');
     return { success: true };
   } catch (error: any) {
-    console.error("Error archiving deceased record:", error);
+    console.error('Error archiving deceased record:', error);
     return { success: false, error: error.message };
   }
 }
 
 export async function unarchiveDeceasedRecord(id: string) {
   try {
+    await requireAdmin();
+
     await prisma.deceasedRecord.update({
       where: { id },
       data: {
         isArchived: false,
         archivedAt: null,
         archiveReason: null,
-      }
+      },
     });
-    revalidatePath('/admin/inventory');
+
     revalidatePath('/admin/deceased-information');
     revalidatePath('/admin/archive');
-    revalidatePath('/admin/archieve');
     revalidatePath('/admin/payment-records');
     return { success: true };
   } catch (error: any) {
-    console.error("Error unarchiving deceased record:", error);
+    console.error('Error unarchiving deceased record:', error);
     return { success: false, error: error.message };
   }
 }
 
 export async function deleteDeceasedRecord(id: string) {
   try {
+    await requireRole(['Super Administrator', 'Cemetery Staff']);
+
     await prisma.deceasedRecord.delete({
       where: { id },
     });
-    revalidatePath('/admin/inventory');
+
     revalidatePath('/admin/deceased-information');
     revalidatePath('/admin/archive');
-    revalidatePath('/admin/archieve');
     revalidatePath('/admin/payment-records');
     return { success: true };
   } catch (error: any) {
-    console.error("Error deleting deceased record:", error);
+    console.error('Error deleting deceased record:', error);
     return { success: false, error: error.message };
   }
 }
 
 export async function deleteMultipleDeceasedRecords(ids: string[]) {
   try {
+    // Bulk destruction requires Super Administrator privilege
+    await requireRole(['Super Administrator']);
+
     await prisma.deceasedRecord.deleteMany({
       where: { id: { in: ids } },
     });
-    revalidatePath('/admin/inventory');
+
     revalidatePath('/admin/deceased-information');
     revalidatePath('/admin/archive');
-    revalidatePath('/admin/archieve');
     revalidatePath('/admin/payment-records');
     return { success: true };
   } catch (error: any) {
-    console.error("Error deleting multiple deceased records:", error);
+    console.error('Error deleting multiple deceased records:', error);
     return { success: false, error: error.message };
   }
 }

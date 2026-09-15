@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendSmsNotification, sendBulkSmsNotification } from '../../../../actions/sms';
+import { requireAdmin } from '../../../../../lib/auth';
 
 /**
  * POST /api/admin/sms/send
@@ -10,8 +11,11 @@ import { sendSmsNotification, sendBulkSmsNotification } from '../../../../action
  */
 export async function POST(req: NextRequest) {
   try {
+    // Defense-in-depth: verify admin session and use authenticated identity for sentBy
+    const session = await requireAdmin();
     const body = await req.json();
-    const { recipient, recipients, recipientName, message, type = 'CUSTOM', sentBy = 'Admin' } = body;
+    const { recipient, recipients, recipientName, message, type = 'CUSTOM' } = body;
+    const sentBy = session.name || session.email;
 
     // Handle Bulk SMS if an array of recipients is provided
     if (Array.isArray(recipients) && recipients.length > 0) {

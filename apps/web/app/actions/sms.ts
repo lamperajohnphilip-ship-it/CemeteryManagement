@@ -7,6 +7,7 @@ import {
   isValidPhilippineNumber,
   calculateSmsSegments,
 } from '../../lib/sms-utils';
+import { requireAdmin, requireRole } from '../../lib/auth';
 
 // Re-export so existing imports from actions/sms keep working on the server side
 export { normalizePhilippineNumber, isValidPhilippineNumber, calculateSmsSegments };
@@ -229,7 +230,9 @@ export async function sendBulkSmsNotification(params: {
   type?: string;
   sentBy?: string;
 }) {
-  const { recipients, defaultMessage = '', type = 'BULK', sentBy = 'Admin' } = params;
+  // Bulk SMS requires Super Administrator privileges
+  const admin = await requireRole(['Super Administrator']);
+  const { recipients, defaultMessage = '', type = 'BULK', sentBy = admin.name || 'Admin' } = params;
 
   if (!recipients || recipients.length === 0) {
     return { success: false, error: 'Please provide at least one recipient.' };
@@ -303,6 +306,7 @@ export async function getSmsHistory(options?: {
   endDate?: string;
 }) {
   try {
+    await requireAdmin();
     const page = Math.max(1, options?.page || 1);
     const limit = Math.max(1, Math.min(100, options?.limit || 10));
     const skip = (page - 1) * limit;
@@ -375,6 +379,7 @@ export async function getSmsHistory(options?: {
  */
 export async function getSmsStats() {
   try {
+    await requireAdmin();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -411,6 +416,7 @@ export async function getSmsStats() {
  */
 export async function deleteSmsLog(id: string) {
   try {
+    await requireAdmin();
     await (prisma as any).smsNotification.delete({
       where: { id },
     });

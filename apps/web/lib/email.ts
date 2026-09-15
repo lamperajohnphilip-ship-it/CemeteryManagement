@@ -1070,3 +1070,40 @@ export async function sendTestSystemEmail(
   }
 }
 
+/**
+ * Sends a generic system email notification (e.g., password recovery codes).
+ */
+export async function sendSystemEmail(
+  to: string,
+  subject: string,
+  htmlContent: string
+): Promise<boolean> {
+  try {
+    if (!to || !to.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to.trim())) {
+      console.warn('[sendSystemEmail] Invalid recipient email address:', to);
+      return false;
+    }
+
+    const transporter = createTransporter();
+    if (!transporter) {
+      console.warn('[sendSystemEmail] SMTP transporter unconfigured.');
+      return false;
+    }
+
+    const senderName = process.env.EMAIL_FROM || 'Municipality of Jasaan Cemetery Management System';
+    const userEmail = process.env.EMAIL_USER?.trim() || 'cemetery@jasaan.gov.ph';
+    const fromHeader = `"${senderName}" <${userEmail}>`;
+
+    await transporter.sendMail({
+      from: fromHeader,
+      to: to.trim(),
+      subject,
+      html: htmlContent,
+    });
+
+    return true;
+  } catch (err) {
+    console.error('[sendSystemEmail Error]:', err);
+    return false;
+  }
+}

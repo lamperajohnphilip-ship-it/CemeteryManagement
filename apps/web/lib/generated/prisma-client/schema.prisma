@@ -48,6 +48,11 @@ model DeceasedRecord {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([NAME_OF_DECEASED])
+  @@index([PAYORS_NAME])
+  @@index([CONTACT_NO])
+  @@index([STATUS])
+  @@index([isArchived])
   @@map("deceased_records")
 }
 
@@ -82,6 +87,11 @@ model PaymentRecord {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([NAME_OF_DECEASED])
+  @@index([PAYORS_NAME])
+  @@index([CONTACT_NO])
+  @@index([STATUS])
+  @@index([deceasedRecordId])
   @@map("payment_records")
 }
 
@@ -110,6 +120,9 @@ model Inquiries {
 
   emailLogs EmailNotificationLog[]
 
+  @@index([email])
+  @@index([STATUS])
+  @@index([createdAt])
   @@map("inquiries")
 }
 
@@ -126,6 +139,8 @@ model Announcement {
   validUntil String?
   views      Int      @default(0)
 
+  @@index([status])
+  @@index([date])
   @@map("announcements")
 }
 
@@ -143,6 +158,9 @@ model SmsNotification {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  @@index([recipient])
+  @@index([status])
+  @@index([createdAt])
   @@map("sms_notifications")
 }
 
@@ -241,6 +259,18 @@ model EmailVerification {
 
   @@index([email])
   @@map("email_verifications")
+}
+
+model PasswordReset {
+  id        String    @id @default(cuid())
+  email     String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+  @@map("password_resets")
 }
 
 model EmailNotificationLog {

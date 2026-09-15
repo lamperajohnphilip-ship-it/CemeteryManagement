@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSmsHistory, getSmsStats } from '../../../../actions/sms';
+import { requireAdmin } from '../../../../../lib/auth';
 
 /**
  * GET /api/admin/sms/history
@@ -8,6 +9,9 @@ import { getSmsHistory, getSmsStats } from '../../../../actions/sms';
  */
 export async function GET(req: NextRequest) {
   try {
+    // Defense-in-depth: verify admin session
+    await requireAdmin();
+
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = parseInt(searchParams.get('limit') || '10', 10);

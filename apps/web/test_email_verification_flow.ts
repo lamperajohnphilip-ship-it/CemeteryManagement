@@ -129,7 +129,6 @@ async function runVerificationTests() {
     CONTACT: '0918-111-2222',
     relationship: 'Relative',
     reason: 'Grave Reservation',
-    skipVerification: true,
   });
 
   const rejectRes = await rejectInquiry(inq2.record!.id, 'Slot unavailable on chosen date.');

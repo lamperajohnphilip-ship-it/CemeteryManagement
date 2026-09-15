@@ -4,6 +4,7 @@ import { prisma } from '../../lib/prisma';
 import { verifyPassword, hashPassword } from '../../lib/crypto';
 import { sendSmsNotification } from './sms';
 import { sendTestSystemEmail } from '../../lib/email';
+import { requireAdmin, requireRole } from '../../lib/auth';
 import crypto from 'crypto';
 
 /**
@@ -95,7 +96,8 @@ export async function getOrCreateSystemSettings() {
  */
 export async function getSettingsData(adminEmail?: string) {
   try {
-    const targetEmail = adminEmail || 'admin@jasaan.gov.ph';
+    const session = await requireAdmin();
+    const targetEmail = adminEmail || session.email;
     const [settings, admin, auditLogs, auditCount] = await Promise.all([
       getOrCreateSystemSettings(),
       prisma.admin.findUnique({
@@ -134,13 +136,13 @@ export async function getSettingsData(adminEmail?: string) {
       success: true,
       settings,
       admin: admin || {
-        id: '',
+        id: session.adminId,
         email: targetEmail,
-        name: 'Super Admin',
+        name: session.name || 'Super Admin',
         username: 'superadmin',
         contactNumber: '+63 88 888 0000',
-        role: 'Super Administrator',
-        department: 'MEEDO - Municipal Environment & Natural Resources Office',
+        role: session.role || 'Super Administrator',
+        department: session.department || 'MEEDO - Municipal Environment & Natural Resources Office',
         avatar: null,
         sessionTimeout: 60,
         createdAt: new Date(),
@@ -179,7 +181,10 @@ export async function updateAdminProfile(
   }
 ) {
   try {
-    if (!email || !data.name?.trim()) {
+    const session = await requireRole(['Super Administrator']);
+    const targetEmail = email || session.email;
+
+    if (!targetEmail || !data.name?.trim()) {
       return { success: false, error: 'Full name is required.' };
     }
 
@@ -188,7 +193,7 @@ export async function updateAdminProfile(
       const existing = await prisma.admin.findFirst({
         where: {
           username: data.username.trim(),
-          NOT: { email },
+          NOT: { email: targetEmail },
         },
       });
       if (existing) {
@@ -197,7 +202,7 @@ export async function updateAdminProfile(
     }
 
     const updated = await prisma.admin.update({
-      where: { email },
+      where: { email: targetEmail },
       data: {
         name: data.name.trim(),
         username: data.username?.trim() || null,
@@ -219,10 +224,10 @@ export async function updateAdminProfile(
     });
 
     await recordAuditLog(
-      `Updated Admin Profile: ${updated.name} (${email})`,
+      `Updated Admin Profile: ${updated.name} (${targetEmail})`,
       'SETTINGS_CHANGED',
       'Success',
-      updated.name || email,
+      session.name || targetEmail,
       `Updated contact: ${updated.contactNumber || 'None'}, Department: ${updated.department || 'Default'}`
     );
 
@@ -242,7 +247,10 @@ export async function updateAdminPassword(
   newPassword: string
 ) {
   try {
-    if (!email || !currentPassword || !newPassword) {
+    const session = await requireRole(['Super Administrator']);
+    const targetEmail = email || session.email;
+
+    if (!targetEmail || !currentPassword || !newPassword) {
       return { success: false, error: 'Please enter all required password fields.' };
     }
 
@@ -258,7 +266,7 @@ export async function updateAdminPassword(
     }
 
     const admin = await prisma.admin.findUnique({
-      where: { email },
+      where: { email: targetEmail },
     });
 
     if (!admin) {
@@ -304,14 +312,16 @@ export async function updateAdminPassword(
 /**
  * 2. Account Security: Invalidate all sessions / Logout from all devices.
  */
-export async function logoutAllDevices(email: string) {
+export async function logoutAllDevices(email?: string) {
   try {
-    const admin = await prisma.admin.findUnique({ where: { email } });
+    const session = await requireAdmin();
+    const targetEmail = session.email;
+    const admin = await prisma.admin.findUnique({ where: { email: targetEmail } });
     await recordAuditLog(
       `Administrator logged out from all active sessions & devices`,
       'LOGOUT',
       'Success',
-      admin?.name || email
+      session.name || targetEmail
     );
     return { success: true, message: 'Successfully revoked all active sessions.' };
   } catch (error: any) {
@@ -335,9 +345,12 @@ export async function updateSystemSettings(
     dateFormat?: string;
     timeFormat?: string;
   },
-  adminEmail: string = 'admin@jasaan.gov.ph'
+  adminEmail?: string
 ) {
   try {
+    const session = await requireRole(['Super Administrator']);
+    const targetAdmin = session.name || session.email;
+
     const updated = await prisma.systemSetting.upsert({
       where: { id: 'default' },
       update: {
@@ -353,7 +366,7 @@ export async function updateSystemSettings(
       `Updated System Configuration: ${data.systemName || updated.systemName}`,
       'SYSTEM_CONFIG_CHANGED',
       'Success',
-      adminEmail,
+      targetAdmin,
       `Timezone: ${updated.timeZone}, DateFormat: ${updated.dateFormat}, TimeFormat: ${updated.timeFormat}`
     );
 
@@ -378,9 +391,12 @@ export async function updateNotificationSettings(
     notifGraveLocator?: boolean;
     notifSystem?: boolean;
   },
-  adminEmail: string = 'admin@jasaan.gov.ph'
+  adminEmail?: string
 ) {
   try {
+    const session = await requireRole(['Super Administrator']);
+    const targetAdmin = session.name || session.email;
+
     const updated = await prisma.systemSetting.upsert({
       where: { id: 'default' },
       update: {
@@ -396,7 +412,7 @@ export async function updateNotificationSettings(
       `Updated System Notification Preferences`,
       'NOTIFICATION_SETTINGS_CHANGED',
       'Success',
-      adminEmail,
+      targetAdmin,
       `Inquiries: ${updated.notifNewInquiry}, Payments: ${updated.notifPayment}, Announcements: ${updated.notifAnnouncement}`
     );
 
@@ -416,9 +432,12 @@ export async function updateSmsSettings(
     smsProvider?: string;
     smsSenderName?: string;
   },
-  adminEmail: string = 'admin@jasaan.gov.ph'
+  adminEmail?: string
 ) {
   try {
+    const session = await requireRole(['Super Administrator']);
+    const targetAdmin = session.name || session.email;
+
     const updated = await prisma.systemSetting.upsert({
       where: { id: 'default' },
       update: {
@@ -434,7 +453,7 @@ export async function updateSmsSettings(
       `Updated SMS Configuration (Enabled: ${updated.smsEnabled}, Provider: ${updated.smsProvider}, Sender: ${updated.smsSenderName})`,
       'SETTINGS_CHANGED',
       'Success',
-      adminEmail
+      targetAdmin
     );
 
     return { success: true, settings: updated };
@@ -505,9 +524,12 @@ export async function updateEmailSettings(
     emailSenderName?: string;
     emailSenderAddress?: string;
   },
-  adminEmail: string = 'admin@jasaan.gov.ph'
+  adminEmail?: string
 ) {
   try {
+    const session = await requireRole(['Super Administrator']);
+    const targetAdmin = adminEmail || session.name || session.email;
+
     const updated = await prisma.systemSetting.upsert({
       where: { id: 'default' },
       update: {
@@ -523,7 +545,7 @@ export async function updateEmailSettings(
       `Updated Email Configuration (Enabled: ${updated.emailEnabled}, Sender: ${updated.emailSenderName})`,
       'SETTINGS_CHANGED',
       'Success',
-      adminEmail
+      targetAdmin
     );
 
     return { success: true, settings: updated };
@@ -538,9 +560,12 @@ export async function updateEmailSettings(
  */
 export async function testEmailConnection(
   recipientEmail: string,
-  adminEmail: string = 'admin@jasaan.gov.ph'
+  adminEmail?: string
 ) {
   try {
+    const session = await requireRole(['Super Administrator']);
+    const targetAdmin = adminEmail || session.name || session.email;
+
     if (!recipientEmail?.trim()) {
       return { success: false, error: 'Please enter a valid email address for the test.' };
     }
@@ -553,7 +578,7 @@ export async function testEmailConnection(
         `Executed SMTP Email Test to ${recipientEmail} (Successful)`,
         'SETTINGS_CHANGED',
         'Success',
-        adminEmail
+        targetAdmin
       );
       return {
         success: true,
@@ -564,7 +589,7 @@ export async function testEmailConnection(
         `Failed SMTP Email Test to ${recipientEmail} (${result.error || 'SMTP error'})`,
         'SETTINGS_CHANGED',
         'Warning',
-        adminEmail
+        targetAdmin
       );
       return {
         success: false,
@@ -591,9 +616,12 @@ export async function updateUserMobileSettings(
     maintenanceMode?: boolean;
     maintenanceMessage?: string;
   },
-  adminEmail: string = 'admin@jasaan.gov.ph'
+  adminEmail?: string
 ) {
   try {
+    const session = await requireRole(['Super Administrator']);
+    const targetAdmin = adminEmail || session.name || session.email;
+
     const updated = await prisma.systemSetting.upsert({
       where: { id: 'default' },
       update: {
@@ -609,7 +637,7 @@ export async function updateUserMobileSettings(
       `Updated User & Mobile Access Controls (Maintenance Mode: ${updated.maintenanceMode ? 'ENABLED' : 'DISABLED'})`,
       'SYSTEM_CONFIG_CHANGED',
       updated.maintenanceMode ? 'Warning' : 'Success',
-      adminEmail,
+      targetAdmin,
       `UserAccess: ${updated.userAccessEnabled}, MobileApp: ${updated.mobileAppEnabled}, Inquiries: ${updated.inquiriesEnabled}`
     );
 
@@ -629,9 +657,12 @@ export async function updateAppearanceSettings(
     sidebarBehavior?: string;
     layoutDensity?: string;
   },
-  adminEmail: string = 'admin@jasaan.gov.ph'
+  adminEmail?: string
 ) {
   try {
+    const session = await requireRole(['Super Administrator']);
+    const targetAdmin = adminEmail || session.name || session.email;
+
     const updated = await prisma.systemSetting.upsert({
       where: { id: 'default' },
       update: {
@@ -647,7 +678,7 @@ export async function updateAppearanceSettings(
       `Updated Dashboard Appearance Settings (Theme: ${updated.defaultTheme}, Sidebar: ${updated.sidebarBehavior}, Density: ${updated.layoutDensity})`,
       'SETTINGS_CHANGED',
       'Success',
-      adminEmail
+      targetAdmin
     );
 
     return { success: true, settings: updated };
@@ -669,9 +700,12 @@ export async function updateSystemPreferences(
     timeFormat?: string;
     timeZone?: string;
   },
-  adminEmail: string = 'admin@jasaan.gov.ph'
+  adminEmail?: string
 ) {
   try {
+    const session = await requireRole(['Super Administrator']);
+    const targetAdmin = adminEmail || session.name || session.email;
+
     const updated = await prisma.systemSetting.upsert({
       where: { id: 'default' },
       update: {
@@ -687,7 +721,7 @@ export async function updateSystemPreferences(
       `Updated System Preferences (ItemsPerPage: ${updated.itemsPerPage}, Lang: ${updated.language}, DefaultPage: ${updated.defaultDashboardPage})`,
       'SETTINGS_CHANGED',
       'Success',
-      adminEmail
+      targetAdmin
     );
 
     return { success: true, settings: updated };
@@ -700,8 +734,12 @@ export async function updateSystemPreferences(
 /**
  * 10. Data & Backup: Generates a complete, structured JSON backup of cemetery databases.
  */
-export async function triggerManualBackup(adminEmail: string = 'admin@jasaan.gov.ph') {
+export async function triggerManualBackup(adminEmail?: string) {
+  let targetAdmin = adminEmail || 'System Administrator';
   try {
+    const session = await requireRole(['Super Administrator']);
+    targetAdmin = session.name || session.email;
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `cemetery_backup_${timestamp}.json`;
 
@@ -721,7 +759,7 @@ export async function triggerManualBackup(adminEmail: string = 'admin@jasaan.gov
       timestamp: new Date().toISOString(),
       municipality: 'Municipality of Jasaan',
       system: 'Web and Mobile-based Cemetery Management System',
-      exportedBy: adminEmail,
+      exportedBy: targetAdmin,
       counts: {
         deceasedRecords: deceased.length,
         paymentRecords: payments.length,
@@ -764,7 +802,7 @@ export async function triggerManualBackup(adminEmail: string = 'admin@jasaan.gov
       `Manual Database Backup Created: ${filename} (Total Records: ${deceased.length + payments.length + inquiries.length})`,
       'BACKUP',
       'Success',
-      adminEmail,
+      targetAdmin,
       `SHA-256 Checksum: ${checksum}`
     );
 
@@ -782,7 +820,7 @@ export async function triggerManualBackup(adminEmail: string = 'admin@jasaan.gov
       `Manual Database Backup Attempt Failed: ${error?.message || 'Unknown error'}`,
       'BACKUP',
       'Failed',
-      adminEmail
+      targetAdmin
     );
     return {
       success: false,
@@ -799,9 +837,12 @@ export async function updateBackupConfig(
     autoBackupEnabled?: boolean;
     backupFrequency?: string;
   },
-  adminEmail: string = 'admin@jasaan.gov.ph'
+  adminEmail?: string
 ) {
   try {
+    const session = await requireRole(['Super Administrator']);
+    const targetAdmin = adminEmail || session.name || session.email;
+
     const updated = await prisma.systemSetting.upsert({
       where: { id: 'default' },
       update: {
@@ -817,7 +858,7 @@ export async function updateBackupConfig(
       `Updated Backup Schedule (Auto-backup: ${updated.autoBackupEnabled}, Frequency: ${updated.backupFrequency})`,
       'SETTINGS_CHANGED',
       'Success',
-      adminEmail
+      targetAdmin
     );
 
     return { success: true, settings: updated };
@@ -837,6 +878,7 @@ export async function getAuditLogs(params: {
   limit?: number;
 }) {
   try {
+    await requireAdmin();
     const page = Math.max(1, params.page || 1);
     const limit = Math.min(100, Math.max(1, params.limit || 20));
     const skip = (page - 1) * limit;
@@ -881,8 +923,11 @@ export async function getAuditLogs(params: {
 /**
  * 11. Audit & Activity: Clear or reset audit logs with administrative confirmation.
  */
-export async function clearAuditLogs(adminEmail: string = 'admin@jasaan.gov.ph') {
+export async function clearAuditLogs(adminEmail?: string) {
   try {
+    const session = await requireRole(['Super Administrator']);
+    const targetAdmin = adminEmail || session.name || session.email;
+
     await prisma.adminAuditLog.deleteMany({});
 
     // Record the reset event itself
@@ -891,7 +936,7 @@ export async function clearAuditLogs(adminEmail: string = 'admin@jasaan.gov.ph')
         activity: 'Audit logs cleared and archived by Administrator',
         category: 'SYSTEM_CONFIG_CHANGED',
         status: 'Warning',
-        admin: adminEmail,
+        admin: targetAdmin,
         details: 'System audit log history was purged with administrator approval.',
       },
     });

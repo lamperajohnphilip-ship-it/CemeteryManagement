@@ -306,6 +306,15 @@ exports.Prisma.EmailVerificationScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.PasswordResetScalarFieldEnum = {
+  id: 'id',
+  email: 'email',
+  tokenHash: 'tokenHash',
+  expiresAt: 'expiresAt',
+  usedAt: 'usedAt',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.EmailNotificationLogScalarFieldEnum = {
   id: 'id',
   inquiryId: 'inquiryId',
@@ -345,6 +354,7 @@ exports.Prisma.ModelName = {
   SystemSetting: 'SystemSetting',
   AdminAuditLog: 'AdminAuditLog',
   EmailVerification: 'EmailVerification',
+  PasswordReset: 'PasswordReset',
   EmailNotificationLog: 'EmailNotificationLog'
 };
 

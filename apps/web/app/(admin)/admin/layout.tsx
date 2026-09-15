@@ -18,17 +18,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const toggleSidebar = () => setCollapsed(!collapsed);
   const toggleMobile = () => setMobileOpen(!mobileOpen);
 
-  // ── Auth guard & Session Timeout ─────────────────────────
-  const checkAuth = useCallback(() => {
-    const session = localStorage.getItem('adminProfile');
-    if (!session) {
-      router.replace('/admin-log');
-      return false;
-    }
-    try {
-      setAdminProfile(JSON.parse(session));
-    } catch (e) {}
-    return true;
+  // ── Server-Verified Auth Guard & Inactivity Monitor ─────
+  useEffect(() => {
+    let isMounted = true;
+    import('../../actions/auth')
+      .then(({ getAdminSessionProfile }) => getAdminSessionProfile())
+      .then((prof) => {
+        if (!isMounted) return;
+        if (prof) {
+          setAdminProfile(prof);
+          setAuthChecked(true);
+        } else {
+          router.replace('/admin-log');
+        }
+      })
+      .catch(() => {
+        if (isMounted) router.replace('/admin-log');
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [router]);
 
   useEffect(() => {
@@ -37,19 +47,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, []);
 
   useEffect(() => {
-    if (!checkAuth()) return;
-    setAuthChecked(true);
+    if (!authChecked) return;
 
-    // Inactivity timeout handler
     let timeoutMinutes = 60;
-    try {
-      const stored = localStorage.getItem('adminProfile');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.sessionTimeout) timeoutMinutes = Number(parsed.sessionTimeout);
-      }
-    } catch (e) {}
-
     let lastActivity = Date.now();
     const updateActivity = () => {
       lastActivity = Date.now();
@@ -58,27 +58,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const interval = setInterval(() => {
       const elapsed = Date.now() - lastActivity;
       if (elapsed > timeoutMinutes * 60 * 1000) {
-        localStorage.removeItem('adminProfile');
-        router.replace('/admin-log');
+        handleLogout();
       }
     }, 30000);
 
     const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
     events.forEach((ev) => window.addEventListener(ev, updateActivity, { passive: true }));
 
-    // Catch browser Back button after logout
-    const handlePopState = () => {
-      if (!localStorage.getItem('adminProfile')) {
-        router.replace('/admin-log');
-      }
-    };
-    window.addEventListener('popstate', handlePopState);
     return () => {
       clearInterval(interval);
       events.forEach((ev) => window.removeEventListener(ev, updateActivity));
-      window.removeEventListener('popstate', handlePopState);
     };
-  }, [checkAuth, router]);
+  }, [authChecked]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -87,6 +78,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  const isSuperAdmin = !adminProfile?.role || adminProfile.role.toLowerCase() === 'super administrator';
 
   const menuItems = [
     { name: 'CEMETERY OVERVIEW', path: '/admin/cemetery-overview', icon: '⊞' },
@@ -97,18 +90,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'ANNOUNCEMENTS', path: '/admin/announcements', icon: '📣' },
     { name: 'PAYMENT RECORDS', path: '/admin/payment-records', icon: '💰' },
     { name: 'USER FEEDBACK', path: '/admin/reports', icon: '💭' },
-    { name: 'ARCHIVE', path: '/admin/archieve', icon: '📦' },
-    { name: 'SETTINGS', path: '/admin/settings', icon: '⚙️' }
+    { name: 'ARCHIVE', path: '/admin/archive', icon: '📦' },
+    ...(isSuperAdmin ? [{ name: 'SETTINGS', path: '/admin/settings', icon: '⚙️' }] : [])
   ];
 
-  const handleLogout = () => {
-    // Clear session
+  const handleLogout = async () => {
     localStorage.removeItem('adminProfile');
-    // Replace so Back button cannot return to admin
+    try {
+      const { logoutAdmin } = await import('../../actions/auth');
+      await logoutAdmin();
+    } catch (e) {}
     router.replace('/admin-log');
   };
 
-  // Don't render children until auth is confirmed
+  // Don't render children until server auth is confirmed
   if (!authChecked) {
     return (
       <div style={{

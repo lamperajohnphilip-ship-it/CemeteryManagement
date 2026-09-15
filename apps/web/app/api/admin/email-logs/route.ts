@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../lib/prisma';
+import { requireAdmin } from '../../../../lib/auth';
 
 export async function GET(request: Request) {
   try {
+    // Defense-in-depth: verify admin session even though middleware guards /api/admin/*
+    await requireAdmin();
+
     const { searchParams } = new URL(request.url);
     const inquiryId = searchParams.get('inquiryId');
     const recipient = searchParams.get('recipient');
@@ -35,9 +39,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: true, logs });
   } catch (error: any) {
     console.error('API Error fetching email notification logs:', error);
+    const status = error?.message?.includes('Unauthorized') ? 401 : 500;
     return NextResponse.json(
       { success: false, message: error.message || 'Internal server error' },
-      { status: 500 }
+      { status }
     );
   }
 }
