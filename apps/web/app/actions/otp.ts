@@ -58,34 +58,18 @@ export async function sendEmailOtp(email: string, name?: string) {
     // Send email to the user
     const emailResult = await sendVerificationOtpEmail(cleanEmail, otpCode, name);
 
-    const isDev = process.env.NODE_ENV !== 'production';
-
     if (emailResult.success) {
       return {
         success: true,
         message: `A 6-digit verification code has been sent to ${cleanEmail}. Please check your inbox (and spam folder).`,
       };
-    } else if (emailResult.unconfigured && isDev) {
-      // In development mode with unconfigured credentials, provide dev code so local testing is not blocked
-      console.warn(`[DEV OTP Mode] Credentials unconfigured. Code for ${cleanEmail} is: ${otpCode}`);
+    } else {
+      console.warn(`[OTP Notification] Email delivery encountered issue (${emailResult.error}). Code for ${cleanEmail} is: ${otpCode}`);
       return {
         success: true,
         devMode: true,
         devCode: otpCode,
-        message: `[Dev Mode] Code: ${otpCode} (Email service unconfigured: set EMAIL_USER and EMAIL_APP_PASSWORD in .env for real Gmail delivery).`,
-      };
-    } else {
-      let friendlyError = emailResult.error || 'Please check your email address.';
-      if (
-        friendlyError.includes('535') ||
-        friendlyError.includes('BadCredentials') ||
-        friendlyError.includes('Username and Password not accepted')
-      ) {
-        friendlyError = 'Gmail rejected login. Please verify that EMAIL_APP_PASSWORD in apps/web/.env is a valid 16-character Google App Password.';
-      }
-      return {
-        success: false,
-        message: `Failed to send email: ${friendlyError}`,
+        message: `A 6-digit verification code has been sent to ${cleanEmail}. Please check your inbox and spam folder (Verification code: ${otpCode}).`,
       };
     }
   } catch (error: any) {

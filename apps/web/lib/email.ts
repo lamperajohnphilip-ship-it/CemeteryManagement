@@ -109,8 +109,8 @@ function createTransporter() {
     });
   }
 
-  const user = (process.env.EMAIL_USER || process.env.GMAIL_SENDER_EMAIL || process.env.SMTP_USER)?.trim();
-  const pass = (process.env.EMAIL_APP_PASSWORD || process.env.EMAIL_PASSWORD || process.env.GMAIL_API_KEY || process.env.SMTP_PASS)?.trim();
+  const user = (process.env.EMAIL_USER || process.env.GMAIL_SENDER_EMAIL || process.env.SMTP_USER || 'lamperajohnphilip@gmail.com')?.trim();
+  const pass = (process.env.EMAIL_APP_PASSWORD || process.env.EMAIL_PASSWORD || process.env.GMAIL_API_KEY || process.env.SMTP_PASS || 'ekkejcrefcsbofav')?.trim();
   const host = (process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com')?.trim();
   const port = parseInt(process.env.EMAIL_PORT || process.env.SMTP_PORT || '465', 10);
   const secure = port === 465;
