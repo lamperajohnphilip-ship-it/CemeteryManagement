@@ -6,10 +6,10 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const testTo = body.to || process.env.EMAIL_USER;
 
-    const user = process.env.EMAIL_USER;
-    const pass = process.env.EMAIL_APP_PASSWORD || process.env.EMAIL_PASSWORD;
-    const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
-    const port = parseInt(process.env.EMAIL_PORT || '465', 10);
+    const user = process.env.EMAIL_USER || process.env.SMTP_USER || process.env.GMAIL_SENDER_EMAIL;
+    const pass = process.env.EMAIL_APP_PASSWORD || process.env.EMAIL_PASSWORD || process.env.SMTP_PASS || process.env.GMAIL_API_KEY;
+    const host = process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com';
+    const port = parseInt(process.env.EMAIL_PORT || process.env.SMTP_PORT || '465', 10);
     const secure = port === 465;
 
     if (!user || !pass) {

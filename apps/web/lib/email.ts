@@ -109,10 +109,10 @@ function createTransporter() {
     });
   }
 
-  const user = process.env.EMAIL_USER || process.env.GMAIL_SENDER_EMAIL;
-  const pass = process.env.EMAIL_APP_PASSWORD || process.env.EMAIL_PASSWORD || process.env.GMAIL_API_KEY;
-  const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
-  const port = parseInt(process.env.EMAIL_PORT || '465', 10);
+  const user = (process.env.EMAIL_USER || process.env.GMAIL_SENDER_EMAIL || process.env.SMTP_USER)?.trim();
+  const pass = (process.env.EMAIL_APP_PASSWORD || process.env.EMAIL_PASSWORD || process.env.GMAIL_API_KEY || process.env.SMTP_PASS)?.trim();
+  const host = (process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com')?.trim();
+  const port = parseInt(process.env.EMAIL_PORT || process.env.SMTP_PORT || '465', 10);
   const secure = port === 465;
 
   if (!user || !pass) {
@@ -151,8 +151,8 @@ function createTransporter() {
  * Returns a properly formatted RFC 5322 "From" header: `"Display Name" <email@domain.com>`.
  */
 export function getEmailSenderHeader(): string {
-  const senderEmail = (process.env.EMAIL_USER || process.env.GMAIL_SENDER_EMAIL || 'lamperajohnphilip@gmail.com').trim();
-  const rawFrom = process.env.EMAIL_FROM?.trim();
+  const senderEmail = (process.env.EMAIL_USER || process.env.GMAIL_SENDER_EMAIL || process.env.SMTP_USER || 'lamperajohnphilip@gmail.com').trim();
+  const rawFrom = (process.env.EMAIL_FROM || process.env.SMTP_FROM)?.trim();
   if (!rawFrom) {
     return `"Municipality of Jasaan Cemetery Management System" <${senderEmail}>`;
   }
@@ -1001,9 +1001,9 @@ export async function sendTestSystemEmail(
       };
     }
 
-    const senderName = customSenderName?.trim() || process.env.EMAIL_FROM || 'Municipality of Jasaan Cemetery Management System';
-    const userEmail = process.env.EMAIL_USER?.trim() || 'cemetery@jasaan.gov.ph';
-    const fromHeader = `"${senderName}" <${userEmail}>`;
+    const fromHeader = customSenderName?.trim()
+      ? `"${customSenderName.trim().replace(/"/g, '')}" <${(process.env.EMAIL_USER || process.env.SMTP_USER || 'cemetery@jasaan.gov.ph').trim()}>`
+      : getEmailSenderHeader();
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -1090,9 +1090,7 @@ export async function sendSystemEmail(
       return false;
     }
 
-    const senderName = process.env.EMAIL_FROM || 'Municipality of Jasaan Cemetery Management System';
-    const userEmail = process.env.EMAIL_USER?.trim() || 'cemetery@jasaan.gov.ph';
-    const fromHeader = `"${senderName}" <${userEmail}>`;
+    const fromHeader = getEmailSenderHeader();
 
     await transporter.sendMail({
       from: fromHeader,
