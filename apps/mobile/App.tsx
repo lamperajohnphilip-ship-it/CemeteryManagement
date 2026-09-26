@@ -35,7 +35,7 @@ function getBaseUrl(): string {
     return `http://${ip}:3000`;
   }
   // Fallback for production or if hostUri is unavailable
-  return 'http://localhost:3000';
+  return 'https://cemetery-management-web.vercel.app';
 }
 
 const BASE_URL = getBaseUrl();
