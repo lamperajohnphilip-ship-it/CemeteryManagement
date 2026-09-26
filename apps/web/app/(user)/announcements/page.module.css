@@ -620,3 +620,134 @@
     margin: 0 0.8rem;
   }
 }
+
+/* ========================================================
+   LIGHT MODE OVERRIDES FOR USER ANNOUNCEMENTS
+   ======================================================== */
+:global(html[data-theme="light"]) .annHeader {
+  background: #ffffff !important;
+  border-bottom: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .annHeader h1 {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .subhead {
+  color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .description {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .filterTabs {
+  background: var(--admin-bg) !important;
+  border-bottom: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .filterTab {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .filterTab:hover {
+  color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .filterTabActive {
+  color: var(--admin-gold) !important;
+  border-bottom-color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .announcementCard {
+  background: #ffffff !important;
+  border: 1px solid var(--admin-border) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+}
+
+:global(html[data-theme="light"]) .announcementTitle {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .announcementDate {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .announcementContent {
+  color: var(--admin-text-main) !important;
+  border-bottom: 1px solid var(--admin-border-subtle) !important;
+}
+
+:global(html[data-theme="light"]) .scheduleBadge {
+  background: var(--admin-input-bg) !important;
+  border: 1px solid var(--admin-border) !important;
+  color: var(--admin-text-main) !important;
+}
+
+:global(html[data-theme="light"]) .reactionBtn {
+  background: var(--admin-input-bg) !important;
+  border: 1px solid var(--admin-input-border) !important;
+  color: var(--admin-text-main) !important;
+}
+
+:global(html[data-theme="light"]) .reactionBtn:hover {
+  background: var(--admin-gold-hover) !important;
+  border-color: var(--admin-gold) !important;
+  color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .reactionBtnActive {
+  background: var(--admin-gold-hover) !important;
+  border-color: var(--admin-gold) !important;
+  color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .reactionCount {
+  color: var(--admin-text-main) !important;
+}
+
+:global(html[data-theme="light"]) .badgeEvent {
+  background: rgba(34, 197, 94, 0.1) !important;
+  border-color: rgba(34, 197, 94, 0.3) !important;
+  color: #15803d !important;
+}
+
+:global(html[data-theme="light"]) .badgeHoliday {
+  background: rgba(168, 85, 247, 0.1) !important;
+  border-color: rgba(168, 85, 247, 0.3) !important;
+  color: #7e22ce !important;
+}
+
+:global(html[data-theme="light"]) .badgeMaintenance {
+  background: rgba(249, 115, 22, 0.1) !important;
+  border-color: rgba(249, 115, 22, 0.3) !important;
+  color: #c2410c !important;
+}
+
+:global(html[data-theme="light"]) .badgeEmergency {
+  background: rgba(239, 68, 68, 0.1) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  color: #b91c1c !important;
+}
+
+:global(html[data-theme="light"]) .badgeNotice {
+  background: rgba(14, 165, 233, 0.1) !important;
+  border-color: rgba(14, 165, 233, 0.3) !important;
+  color: #0369a1 !important;
+}
+
+:global(html[data-theme="light"]) .badgeGeneral {
+  background: rgba(161, 98, 7, 0.1) !important;
+  border-color: rgba(161, 98, 7, 0.3) !important;
+  color: #854d0e !important;
+}
+
+:global(html[data-theme="light"]) .annFooter {
+  background: #ffffff !important;
+  border-top: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .annFooterText,
+:global(html[data-theme="light"]) .footerLinks a {
+  color: var(--admin-text-muted) !important;
+}

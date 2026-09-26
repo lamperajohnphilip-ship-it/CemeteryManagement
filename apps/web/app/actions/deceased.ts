@@ -159,7 +159,6 @@ export async function addDeceasedRecord(data: {
 
 export async function getDeceasedRecords() {
   try {
-    await requireAdmin();
     const records = await prisma.deceasedRecord.findMany({
       where: { NOT: { isArchived: true } },
       orderBy: { createdAt: 'desc' },

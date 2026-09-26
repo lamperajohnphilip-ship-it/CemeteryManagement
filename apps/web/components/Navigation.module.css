@@ -57,6 +57,7 @@
   z-index: 149;
   background: rgba(10,9,8,0.6);
   backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.35s;
@@ -210,6 +211,22 @@
 }
 
 /* Light mode overrides inside Navigation.module.css */
+:global(html[data-theme="light"]) .navLogo {
+  color: #ffffff !important;
+}
+
+:global(html[data-theme="light"]) .navLogo svg {
+  stroke: #ffffff !important;
+  color: #ffffff !important;
+}
+
+:global(html[data-theme="light"]) .sidebarOverlay {
+  background: rgba(10, 9, 8, 0.4) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  border: none !important;
+}
+
 :global(html[data-theme="light"]) .sidebarFooter {
   border-top-color: var(--admin-sidebar-border);
 }
@@ -232,3 +249,42 @@
   color: #ffffff !important;
   box-shadow: 0 2px 6px rgba(161, 98, 7, 0.2) !important;
 }
+
+:global(html[data-theme="light"]) .sidebar {
+  background: #ffffff !important;
+  border-right-color: var(--admin-border) !important;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.12) !important;
+}
+
+:global(html[data-theme="light"]) .sidebarHeader {
+  background: var(--fog) !important;
+  border-bottom-color: var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .sidebarBrand {
+  color: var(--gold) !important;
+}
+
+:global(html[data-theme="light"]) .sidebarTagline {
+  color: var(--admin-text-dark) !important;
+}
+
+:global(html[data-theme="light"]) .sidebarNavItem {
+  color: var(--admin-text-main) !important;
+}
+
+:global(html[data-theme="light"]) .sidebarNavItem:hover {
+  background: var(--admin-gold-hover) !important;
+  color: var(--gold) !important;
+}
+
+:global(html[data-theme="light"]) .sidebarNavItemActive {
+  background: var(--admin-nav-active-bg) !important;
+  color: var(--gold) !important;
+  font-weight: 600 !important;
+}
+
+:global(html[data-theme="light"]) .navItemIcon {
+  color: var(--gold) !important;
+}
+

@@ -1,10 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { submitInquiry } from '../../actions/inquiry';
 import { sendEmailOtp, verifyEmailOtp } from '../../actions/otp';
+import { getBookedSchedules, type BookedScheduleItem } from '../../actions/schedule';
 import styles from './page.module.css';
+
+const ALL_TIME_SLOTS = [
+  '8:00 AM \u2013 9:00 AM',
+  '9:00 AM \u2013 10:00 AM',
+  '10:00 AM \u2013 11:00 AM',
+  '11:00 AM \u2013 12:00 PM',
+  '1:00 PM \u2013 2:00 PM',
+  '2:00 PM \u2013 3:00 PM',
+  '3:00 PM \u2013 4:00 PM',
+  '4:00 PM \u2013 5:00 PM',
+];
 
 export default function InquiryPage() {
   const [step, setStep] = useState(1);
@@ -28,6 +40,10 @@ export default function InquiryPage() {
   });
 
   const [errors, setErrors] = useState<Record<string, boolean | string>>({});
+
+  // Schedule availability state
+  const [bookedSlots, setBookedSlots] = useState<BookedScheduleItem[]>([]);
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [refNum, setRefNum] = useState('');
@@ -106,6 +122,30 @@ export default function InquiryPage() {
     }
   }, []);
 
+  // Fetch booked schedules when date changes
+  const fetchScheduleForDate = useCallback(async (dateStr: string) => {
+    if (!dateStr) { setBookedSlots([]); return; }
+    setIsLoadingSlots(true);
+    try {
+      const month = dateStr.substring(0, 7); // 'YYYY-MM'
+      const res = await getBookedSchedules(month);
+      if (res.success && res.schedules) {
+        setBookedSlots(res.schedules);
+      }
+    } catch (_) {}
+    setIsLoadingSlots(false);
+  }, []);
+
+  const getSlotStatus = (date: string, time: string): 'available' | 'accepted' | 'pending' => {
+    for (const slot of bookedSlots) {
+      if (slot.date === date && slot.time === time) {
+        if (slot.status === 'accepted' || slot.status === 'confirmed') return 'accepted';
+        if (slot.status === 'pending' || slot.status === 'in progress') return 'pending';
+      }
+    }
+    return 'available';
+  };
+
   const handleInputChange = (field: string, value: string | boolean) => {
     if (field === 'email') {
       // If user edits email, require re-verification
@@ -114,8 +154,22 @@ export default function InquiryPage() {
       setOtpCode('');
       setOtpMessage(null);
     }
+    if (field === 'preferredDate' && typeof value === 'string') {
+      fetchScheduleForDate(value);
+      // Reset time when date changes
+      setFormData(prev => ({ ...prev, preferredDate: value, preferredTime: '' }));
+      setErrors(prev => ({ ...prev, preferredDate: false, preferredTime: false, slotBooked: false }));
+      return;
+    }
+    if (field === 'preferredTime' && typeof value === 'string') {
+      const status = getSlotStatus(formData.preferredDate, value);
+      if (status === 'accepted') {
+        setErrors(prev => ({ ...prev, slotBooked: 'This schedule is unavailable. Please select another available date and time.' }));
+        return;
+      }
+    }
     setFormData(prev => ({ ...prev, [field]: value }));
-    setErrors(prev => ({ ...prev, [field]: false, emailNotVerified: false }));
+    setErrors(prev => ({ ...prev, [field]: false, emailNotVerified: false, slotBooked: false }));
   };
 
   // --- Email OTP Verification Handlers ---
@@ -221,6 +275,15 @@ export default function InquiryPage() {
     if (!formData.reason) newErrors.reason = true;
     if (!formData.preferredDate) newErrors.preferredDate = true;
     if (!formData.preferredTime) newErrors.preferredTime = true;
+
+    // Check if selected slot is booked
+    if (formData.preferredDate && formData.preferredTime) {
+      const status = getSlotStatus(formData.preferredDate, formData.preferredTime);
+      if (status === 'accepted') {
+        newErrors.slotBooked = 'This schedule is unavailable. Please select another available date and time.';
+        newErrors.preferredTime = true;
+      }
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -398,7 +461,7 @@ export default function InquiryPage() {
         <div className={styles.successDetails}>
           <div className={styles.successDetRow}><div className={styles.successDetKey}>NAME</div><div className={styles.successDetVal}>{formData.firstName + ' ' + formData.lastName}</div></div>
           <div className={styles.successDetRow}><div className={styles.successDetKey}>EMAIL</div><div className={styles.successDetVal}>{formData.email} (✓ Verified)</div></div>
-          <div className={styles.successDetRow}><div className={styles.successDetKey}>REASON</div><div className={styles.successDetVal}>{formData.reason}</div></div>
+          <div className={styles.successDetRow}><div className={styles.successDetKey}>CATEGORY</div><div className={styles.successDetVal}>{formData.reason}</div></div>
           <div className={styles.successDetRow}><div className={styles.successDetKey}>DATE</div><div className={styles.successDetVal}>{fmtDate}</div></div>
           <div className={styles.successDetRow}><div className={styles.successDetKey}>TIME</div><div className={styles.successDetVal}>{formData.preferredTime}</div></div>
           <div className={styles.successDetRow}><div className={styles.successDetKey}>STATUS</div><div className={`${styles.successDetVal} ${styles.statusPending}`}>PENDING · Awaiting Admin Confirmation</div></div>
@@ -787,15 +850,13 @@ export default function InquiryPage() {
             <div className={styles.formCard}>
               <div className={styles.formGrid}>
                 <div className={styles.formGroup}>
-                  <label className={styles.formLabel}>Reason for Inquiry <span className={styles.req}>*</span></label>
+                  <label className={styles.formLabel}>Inquiry Category <span className={styles.req}>*</span></label>
                   <div className={styles.reasonGrid}>
                     {[
-                      { icon: '⚰️', title: 'BURIAL / INTERMENT', value: 'Burial / Interment', desc: 'Schedule a burial or interment service' },
-                      { icon: '📋', title: 'GRAVE RESERVATION', value: 'Grave Reservation', desc: 'Reserve a plot for future use' },
-                      { icon: '🔖', title: 'EXHUMATION REQUEST', value: 'Exhumation Request', desc: 'Request for remains transfer' },
-                      { icon: '📝', title: 'PLOT TRANSFER', value: 'Plot Transfer / Ownership', desc: 'Transfer plot ownership' },
-                      { icon: '🗂️', title: 'RECORDS RETRIEVAL', value: 'Records Retrieval', desc: 'Request official documents' },
-                      { icon: '💬', title: 'OTHER INQUIRY', value: 'Other Inquiry', desc: 'General question or concern' }
+                      { icon: '💳', title: 'PAYMENT INQUIRIES', value: 'Payment Inquiries', desc: 'Payment-related questions and concerns' },
+                      { icon: '⚰️', title: 'BURIAL', value: 'Burial', desc: 'Schedule a burial or interment service' },
+                      { icon: '📜', title: 'CERTIFICATE FOR TRANSFER', value: 'Certificate for Transfer', desc: 'Request certificate for transfer of remains' },
+                      { icon: '💬', title: 'OTHER INQUIRIES', value: 'Other Inquiries', desc: 'General questions or other concerns' }
                     ].map(r => (
                       <div key={r.value} className={`${styles.reasonCard} ${formData.reason === r.value ? styles.reasonCardSelected : ''}`} onClick={() => handleInputChange('reason', r.value)}>
                         <div className={styles.reasonIcon}>{r.icon}</div>
@@ -804,7 +865,7 @@ export default function InquiryPage() {
                       </div>
                     ))}
                   </div>
-                  {errors.reason && <div className={styles.reasonErr} style={{ display: 'block' }}>Please select a reason for your inquiry.</div>}
+                  {errors.reason && <div className={styles.reasonErr} style={{ display: 'block' }}>Please select an inquiry category.</div>}
                 </div>
                 <div className={styles.formRow2}>
                   <div className={styles.formGroup}>
@@ -816,27 +877,53 @@ export default function InquiryPage() {
                     <input className={styles.formInput} type="text" placeholder="e.g. Section A · A-12" value={formData.plot} onChange={e => handleInputChange('plot', e.target.value)} />
                   </div>
                 </div>
-                <div className={styles.formRow2}>
-                  <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>Preferred Date <span className={styles.req}>*</span></label>
-                    <input id="f-date" className={`${styles.formInput} ${errors.preferredDate ? styles.formInputErr : ''}`} type="date" value={formData.preferredDate} onChange={e => handleInputChange('preferredDate', e.target.value)} />
-                    {errors.preferredDate && <div className={styles.errMsg} style={{ display: 'block' }}>Please select a date.</div>}
-                  </div>
-                  <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>Preferred Time <span className={styles.req}>*</span></label>
-                    <select className={`${styles.formSelect} ${errors.preferredTime ? styles.formSelectErr : ''}`} value={formData.preferredTime} onChange={e => handleInputChange('preferredTime', e.target.value)}>
-                      <option value="" disabled>Select time slot…</option>
-                      <option>8:00 AM – 9:00 AM</option>
-                      <option>9:00 AM – 10:00 AM</option>
-                      <option>10:00 AM – 11:00 AM</option>
-                      <option>11:00 AM – 12:00 PM</option>
-                      <option>1:00 PM – 2:00 PM</option>
-                      <option>2:00 PM – 3:00 PM</option>
-                      <option>3:00 PM – 4:00 PM</option>
-                      <option>4:00 PM – 5:00 PM</option>
-                    </select>
-                    {errors.preferredTime && <div className={styles.errMsg} style={{ display: 'block' }}>Please select a time slot.</div>}
-                  </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Preferred Date <span className={styles.req}>*</span></label>
+                  <input id="f-date" className={`${styles.formInput} ${errors.preferredDate ? styles.formInputErr : ''}`} type="date" value={formData.preferredDate} onChange={e => handleInputChange('preferredDate', e.target.value)} />
+                  {errors.preferredDate && <div className={styles.errMsg} style={{ display: 'block' }}>Please select a date.</div>}
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Preferred Time <span className={styles.req}>*</span></label>
+                  {!formData.preferredDate ? (
+                    <div className={styles.slotHint}>Please select a date first to see available time slots.</div>
+                  ) : isLoadingSlots ? (
+                    <div className={styles.slotHint}>⏳ Checking schedule availability…</div>
+                  ) : (
+                    <div className={styles.timeSlotGrid}>
+                      {ALL_TIME_SLOTS.map(slot => {
+                        const status = getSlotStatus(formData.preferredDate, slot);
+                        const isSelected = formData.preferredTime === slot;
+                        const isBooked = status === 'accepted';
+                        const isPending = status === 'pending';
+                        return (
+                          <button
+                            key={slot}
+                            type="button"
+                            className={[
+                              styles.timeSlotBtn,
+                              isSelected ? styles.timeSlotSelected : '',
+                              isBooked ? styles.timeSlotBooked : '',
+                              isPending ? styles.timeSlotPending : '',
+                            ].filter(Boolean).join(' ')}
+                            disabled={isBooked}
+                            onClick={() => handleInputChange('preferredTime', slot)}
+                            title={isBooked ? 'This time slot is unavailable' : isPending ? 'Another inquiry is pending for this slot' : 'Available'}
+                          >
+                            <span className={styles.timeSlotLabel}>{slot}</span>
+                            <span className={styles.timeSlotStatus}>
+                              {isBooked ? 'Unavailable' : isPending ? '⏳ Pending' : '✓ Available'}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {errors.preferredTime && !errors.slotBooked && <div className={styles.errMsg} style={{ display: 'block' }}>Please select a time slot.</div>}
+                  {errors.slotBooked && (
+                    <div className={styles.errMsg} style={{ display: 'block', color: '#f87171', background: 'rgba(248,113,113,0.08)', padding: '10px 14px', borderRadius: '8px', marginTop: '8px', border: '1px solid rgba(248,113,113,0.2)' }}>
+                      ⚠️ {errors.slotBooked}
+                    </div>
+                  )}
                 </div>
                 <div className={styles.formGroup}>
                   <label className={styles.formLabel}>Additional Notes</label>
@@ -870,7 +957,7 @@ export default function InquiryPage() {
               </div>
               <div className={styles.reviewBlock}>
                 <div className={styles.reviewBlockTitle}>INQUIRY DETAILS</div>
-                <div className={styles.reviewRow}><div className={styles.reviewKey}>Reason</div><div className={styles.reviewVal}>{formData.reason}</div></div>
+                <div className={styles.reviewRow}><div className={styles.reviewKey}>Inquiry Category</div><div className={styles.reviewVal}>{formData.reason}</div></div>
                 <div className={styles.reviewRow}><div className={styles.reviewKey}>Deceased</div><div className={styles.reviewVal}>{formData.deceased || 'Not specified'}</div></div>
                 <div className={styles.reviewRow}><div className={styles.reviewKey}>Plot</div><div className={styles.reviewVal}>{formData.plot || 'Not specified'}</div></div>
                 <div className={styles.reviewRow}><div className={styles.reviewKey}>Date</div><div className={styles.reviewVal}>{fmtDate}</div></div>

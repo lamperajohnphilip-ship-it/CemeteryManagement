@@ -47,7 +47,17 @@ export default function AdminLoginPage() {
             role: result.admin.role,
           })
         );
-        router.replace('/admin');
+        const redirectParam = typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('redirect')
+          : null;
+        const destination =
+          redirectParam &&
+          redirectParam.startsWith('/admin') &&
+          redirectParam !== '/admin' &&
+          redirectParam !== '/admin-log'
+            ? redirectParam
+            : '/admin/cemetery-overview';
+        router.replace(destination);
       } else {
         setErrorMsg(result.error || 'Invalid email or password.');
       }

@@ -450,3 +450,136 @@
   .formRow { grid-template-columns: 1fr; }
   .searchInput { width: 160px; }
 }
+
+/* ========================================================
+   LIGHT MODE OVERRIDES FOR ADMIN SHARED DESIGN SYSTEM
+   ======================================================== */
+:global(html[data-theme="light"]) .pageHeader h3 {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .statCardCount {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .panelTitle {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .filterTabs {
+  background: var(--admin-table-hdr-bg) !important;
+  border-bottom: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .filterTab {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .filterTab:hover {
+  color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .filterTabActive {
+  background: var(--admin-gold) !important;
+  color: #ffffff !important;
+  border-color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .filterTabActive .tabCount {
+  background: rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+}
+
+:global(html[data-theme="light"]) .tabCount {
+  background: rgba(161, 98, 7, 0.12) !important;
+  color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .table thead tr {
+  background: var(--admin-table-hdr-bg) !important;
+}
+
+:global(html[data-theme="light"]) .table th {
+  color: var(--admin-gold) !important;
+  border-bottom: 2px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .tableFooter {
+  background: var(--admin-table-hdr-bg) !important;
+  border-top: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .refChip {
+  background: rgba(161, 98, 7, 0.08) !important;
+  border-color: rgba(161, 98, 7, 0.25) !important;
+  color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .toastBanner {
+  background: #ffffff !important;
+  border-color: var(--admin-border) !important;
+  color: var(--admin-text-main) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1) !important;
+}
+
+:global(html[data-theme="light"]) .modal {
+  background: #ffffff !important;
+  border: 1px solid var(--admin-border) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15) !important;
+}
+
+:global(html[data-theme="light"]) .modalHeader {
+  background: var(--admin-table-hdr-bg) !important;
+  border-bottom: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .modalHeader h3 {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .modalFooter {
+  background: var(--admin-table-hdr-bg) !important;
+  border-top: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .detailCard {
+  background: var(--admin-input-bg) !important;
+  border: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .detailCardLabel {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .detailCardValue {
+  color: var(--admin-text-main) !important;
+}
+
+:global(html[data-theme="light"]) .detailCardValue.highlight {
+  color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .alertGreen {
+  background: rgba(34, 197, 94, 0.08) !important;
+  border-color: rgba(34, 197, 94, 0.3) !important;
+  color: #15803d !important;
+}
+
+:global(html[data-theme="light"]) .alertRed {
+  background: rgba(239, 68, 68, 0.08) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  color: #b91c1c !important;
+}
+
+:global(html[data-theme="light"]) .alertYellow {
+  background: rgba(245, 158, 11, 0.08) !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+  color: #b45309 !important;
+}
+
+:global(html[data-theme="light"]) .alertGold {
+  background: rgba(161, 98, 7, 0.08) !important;
+  border-color: rgba(161, 98, 7, 0.3) !important;
+  color: #854d0e !important;
+}
+

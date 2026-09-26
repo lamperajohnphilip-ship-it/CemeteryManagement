@@ -435,3 +435,98 @@
   outline: none;
   border-color: var(--gold);
 }
+
+/* ========================================================
+   LIGHT MODE OVERRIDES FOR USER DASHBOARD
+   ======================================================== */
+:global(html[data-theme="light"]) .heroTitle {
+  color: var(--bone) !important;
+}
+
+:global(html[data-theme="light"]) .searchBox {
+  background: #ffffff !important;
+  border-color: var(--admin-input-border) !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08) !important;
+}
+
+:global(html[data-theme="light"]) .searchInput {
+  color: #111111 !important;
+}
+
+:global(html[data-theme="light"]) .searchInput::placeholder {
+  color: #64748b !important;
+}
+
+:global(html[data-theme="light"]) .searchResultsContainer {
+  background: #ffffff !important;
+  border-color: var(--admin-border) !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.1) !important;
+}
+
+:global(html[data-theme="light"]) .resultsHeader {
+  border-bottom-color: var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .resultsHeader h4 {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .resultsCount {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .resultCard {
+  background: var(--admin-input-bg) !important;
+  border-color: var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .resultCard:hover {
+  background: var(--admin-gold-hover) !important;
+  border-color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .resultName {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .resultMeta {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .profileCard {
+  background: #ffffff !important;
+  border-color: var(--admin-border) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15) !important;
+}
+
+:global(html[data-theme="light"]) .profileInfoItem {
+  background: var(--admin-input-bg) !important;
+  border: 1px solid var(--admin-border-subtle) !important;
+}
+
+:global(html[data-theme="light"]) .profileInfoValue {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .profileDetailRow {
+  border-bottom-color: var(--admin-border-subtle) !important;
+}
+
+:global(html[data-theme="light"]) .profileDetailLabel {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .profileDetailValue {
+  color: var(--admin-text-main) !important;
+}
+
+:global(html[data-theme="light"]) .ratingComment {
+  background: var(--admin-input-bg) !important;
+  border-color: var(--admin-input-border) !important;
+  color: var(--admin-text-main) !important;
+}
+
+:global(html[data-theme="light"]) .taglineFooter {
+  color: var(--admin-text-muted) !important;
+}
+

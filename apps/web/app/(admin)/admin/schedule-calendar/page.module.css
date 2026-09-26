@@ -1,0 +1,788 @@
+/* ========================================================
+   Admin Schedule Calendar — Dark Gold Theme
+   ======================================================== */
+
+/* ---- Page Header ---- */
+.pageHeader {
+  margin-bottom: 28px;
+}
+.pageHeader h3 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: #E2C97E;
+  margin: 0 0 4px 0;
+  letter-spacing: 0.02em;
+}
+.pageHeader p {
+  font-size: 0.85rem;
+  color: #7A7570;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ---- Stats Row ---- */
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.statCard {
+  background: var(--admin-panel-bg);
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: relative;
+  overflow: hidden;
+}
+.statCard::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: 12px 12px 0 0;
+}
+.statAccepted::before { background: #4ade80; }
+.statPending::before { background: #e6b064; }
+.statTotal::before { background: #C8A84B; }
+.statToday::before { background: #60a5fa; }
+.statLabel {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7A7570;
+}
+.statCount {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #E2C97E;
+  line-height: 1;
+  font-family: 'Cormorant Garamond', serif;
+}
+.statSub {
+  font-size: 0.72rem;
+  color: #5a5650;
+}
+
+/* ---- Calendar Panel ---- */
+.calendarPanel {
+  background: var(--admin-panel-bg);
+  border: 1px solid var(--admin-border);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+/* ---- Calendar Toolbar ---- */
+.calendarToolbar {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--admin-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.calendarNav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.calendarNavBtn {
+  background: rgba(200,168,75,0.08);
+  border: 1px solid var(--admin-border);
+  color: #C8A84B;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.calendarNavBtn:hover {
+  background: rgba(200,168,75,0.15);
+  border-color: rgba(200,168,75,0.3);
+}
+.calendarMonth {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #E2C97E;
+  min-width: 200px;
+  text-align: center;
+}
+.calendarActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.todayBtn {
+  background: rgba(200,168,75,0.12);
+  border: 1px solid rgba(200,168,75,0.25);
+  color: #C8A84B;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.todayBtn:hover {
+  background: rgba(200,168,75,0.22);
+}
+.viewToggle {
+  display: flex;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.viewBtn {
+  background: transparent;
+  border: none;
+  color: #7A7570;
+  padding: 6px 14px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.viewBtn:hover {
+  background: rgba(200,168,75,0.08);
+}
+.viewBtnActive {
+  background: rgba(200,168,75,0.15);
+  color: #C8A84B;
+}
+
+/* ---- Calendar Grid ---- */
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+.dayHeader {
+  padding: 10px 8px;
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #7A7570;
+  border-bottom: 1px solid var(--admin-border);
+  background: rgba(0,0,0,0.15);
+}
+.dayCell {
+  min-height: 110px;
+  border-right: 1px solid var(--admin-border);
+  border-bottom: 1px solid var(--admin-border);
+  padding: 6px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.dayCell:nth-child(7n) {
+  border-right: none;
+}
+.dayCell:hover {
+  background: rgba(200,168,75,0.04);
+}
+.dayCellOther {
+  opacity: 0.3;
+}
+.dayCellToday {
+  background: rgba(200,168,75,0.06);
+}
+.dayCellToday .dayNumber {
+  background: #C8A84B;
+  color: #0A0800;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dayNumber {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--admin-text-main, #E8E0D0);
+  margin-bottom: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+}
+.dayEvents {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* ---- Event Badge ---- */
+.eventBadge {
+  font-size: 0.65rem;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  transition: opacity 0.15s;
+  line-height: 1.3;
+}
+.eventBadge:hover {
+  opacity: 0.85;
+}
+.eventAccepted {
+  background: rgba(74,222,128,0.15);
+  color: #4ade80;
+  border-left: 3px solid #4ade80;
+}
+.eventPending {
+  background: rgba(230,176,100,0.15);
+  color: #e6b064;
+  border-left: 3px solid #e6b064;
+}
+.eventRejected {
+  background: rgba(248,113,113,0.12);
+  color: #f87171;
+  border-left: 3px solid #f87171;
+}
+.eventInprogress {
+  background: rgba(250,204,21,0.12);
+  color: #facc15;
+  border-left: 3px solid #facc15;
+}
+.eventCancelled {
+  background: rgba(156,163,175,0.12);
+  color: #9ca3af;
+  border-left: 3px solid #9ca3af;
+}
+.moreEvents {
+  font-size: 0.62rem;
+  color: #9A8A6A;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.moreEvents:hover {
+  color: #C8A84B;
+}
+
+/* ---- Day View Panel ---- */
+.dayViewPanel {
+  background: var(--admin-panel-bg);
+  border: 1px solid var(--admin-border);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+.dayViewHeader {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--admin-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.dayViewTitle {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #E2C97E;
+}
+.dayViewClose {
+  background: none;
+  border: none;
+  color: #7A7570;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+.dayViewClose:hover {
+  background: rgba(200,168,75,0.1);
+  color: #C8A84B;
+}
+.dayViewBody {
+  padding: 16px 20px;
+}
+.timeSlotRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(200,168,75,0.08);
+}
+.timeSlotRow:last-child {
+  border-bottom: none;
+}
+.timeSlotTime {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #C8A84B;
+  min-width: 130px;
+  font-family: 'DM Mono', monospace;
+}
+.timeSlotContent {
+  flex: 1;
+}
+.timeSlotEvent {
+  background: rgba(200,168,75,0.06);
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.timeSlotEvent:hover {
+  border-color: rgba(200,168,75,0.3);
+  background: rgba(200,168,75,0.08);
+}
+.timeSlotEventName {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--admin-text-main, #E8E0D0);
+  margin-bottom: 4px;
+}
+.timeSlotEventMeta {
+  font-size: 0.74rem;
+  color: #7A7570;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.timeSlotAvailable {
+  font-size: 0.78rem;
+  color: #4ade80;
+  font-style: italic;
+  padding: 8px 0;
+}
+
+/* ---- Detail Modal ---- */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+  backdrop-filter: blur(4px);
+}
+.modal {
+  background: var(--admin-panel-bg, #141210);
+  border: 1px solid var(--admin-border, rgba(200,168,75,0.12));
+  border-radius: 16px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+}
+.modalHeader {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--admin-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modalHeader h3 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #E2C97E;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.modalClose {
+  background: none;
+  border: none;
+  color: #7A7570;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  line-height: 1;
+  transition: background 0.2s;
+}
+.modalClose:hover {
+  background: rgba(200,168,75,0.1);
+  color: #C8A84B;
+}
+.modalBody {
+  padding: 20px 22px;
+}
+.modalFooter {
+  padding: 14px 22px;
+  border-top: 1px solid var(--admin-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ---- Detail Grid ---- */
+.detailGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.detailCard {
+  background: rgba(0,0,0,0.15);
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.fullWidth {
+  grid-column: 1 / -1;
+}
+.detailLabel {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7A7570;
+  margin-bottom: 4px;
+}
+.detailValue {
+  font-size: 0.85rem;
+  color: var(--admin-text-main, #E8E0D0);
+  font-weight: 500;
+}
+.highlight {
+  color: #C8A84B;
+}
+
+/* ---- Status Badges ---- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.badgeAccepted {
+  background: rgba(74,222,128,0.12);
+  color: #4ade80;
+}
+.badgePending {
+  background: rgba(230,176,100,0.12);
+  color: #e6b064;
+}
+.badgeRejected {
+  background: rgba(248,113,113,0.12);
+  color: #f87171;
+}
+.badgeInprogress {
+  background: rgba(250,204,21,0.12);
+  color: #facc15;
+}
+.badgeCancelled {
+  background: rgba(156,163,175,0.12);
+  color: #9ca3af;
+}
+
+/* ---- Buttons ---- */
+.btnGold {
+  background: linear-gradient(135deg, #C8A84B, #a38a3a);
+  border: none;
+  color: #0A0800;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.btnGold:hover {
+  opacity: 0.9;
+}
+
+/* ---- Legend ---- */
+.legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #7A7570;
+}
+.legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.legendAccepted { background: #4ade80; }
+.legendPending { background: #e6b064; }
+.legendRejected { background: #f87171; }
+
+/* ---- Empty State ---- */
+.emptyState {
+  text-align: center;
+  padding: 60px 20px;
+  color: #5A5650;
+}
+.emptyIcon {
+  font-size: 3rem;
+  margin-bottom: 12px;
+  opacity: 0.4;
+}
+.emptyState h5 {
+  color: #7A7570;
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+.emptyState p {
+  font-size: 0.82rem;
+  color: #5A5650;
+  margin: 0;
+}
+
+/* ---- Loading ---- */
+.loadingWrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 80px 20px;
+  color: #7A7570;
+  font-size: 0.85rem;
+  gap: 8px;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 900px) {
+  .statsRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .calendarToolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dayCell {
+    min-height: 70px;
+    padding: 4px;
+  }
+  .dayNumber {
+    font-size: 0.7rem;
+  }
+  .eventBadge {
+    font-size: 0.58rem;
+    padding: 2px 4px;
+  }
+  .detailGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .statsRow {
+    grid-template-columns: 1fr;
+  }
+  .dayHeader {
+    font-size: 0.6rem;
+    padding: 6px 2px;
+  }
+  .dayCell {
+    min-height: 50px;
+  }
+}
+
+/* ========================================================
+   LIGHT MODE OVERRIDES FOR ADMIN SCHEDULE CALENDAR
+   ======================================================== */
+:global(html[data-theme="light"]) .pageHeader h3 {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .pageHeader p {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .statCard {
+  background: var(--admin-card-bg) !important;
+  border: 1px solid var(--admin-border) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
+}
+
+:global(html[data-theme="light"]) .statLabel {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .statCount {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .statSub {
+  color: var(--admin-text-dark) !important;
+}
+
+:global(html[data-theme="light"]) .calendarPanel {
+  background: var(--admin-card-bg) !important;
+  border: 1px solid var(--admin-border) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
+}
+
+:global(html[data-theme="light"]) .calendarToolbar {
+  border-bottom: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .calendarNavBtn {
+  background: var(--admin-input-bg) !important;
+  border: 1px solid var(--admin-input-border) !important;
+  color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .calendarNavBtn:hover {
+  background: var(--admin-gold-hover) !important;
+  border-color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .calendarMonth {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .todayBtn {
+  background: var(--admin-gold-hover) !important;
+  border: 1px solid var(--admin-gold) !important;
+  color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .viewToggle {
+  border: 1px solid var(--admin-input-border) !important;
+}
+
+:global(html[data-theme="light"]) .viewBtn {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .viewBtn:hover {
+  background: var(--admin-gold-hover) !important;
+}
+
+:global(html[data-theme="light"]) .viewBtnActive {
+  background: var(--admin-gold) !important;
+  color: #ffffff !important;
+}
+
+:global(html[data-theme="light"]) .dayHeader {
+  background: var(--admin-table-hdr-bg) !important;
+  color: var(--admin-gold) !important;
+  border-bottom: 2px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .dayCell {
+  border-right: 1px solid var(--admin-border) !important;
+  border-bottom: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .dayCell:hover {
+  background: #f5f0e8 !important;
+}
+
+:global(html[data-theme="light"]) .dayCellToday {
+  background: rgba(161, 98, 7, 0.08) !important;
+}
+
+:global(html[data-theme="light"]) .dayCellToday .dayNumber {
+  background: var(--admin-gold) !important;
+  color: #ffffff !important;
+}
+
+:global(html[data-theme="light"]) .dayNumber {
+  color: var(--admin-text-main) !important;
+}
+
+:global(html[data-theme="light"]) .dayViewPanel {
+  background: var(--admin-card-bg) !important;
+  border: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .dayViewHeader {
+  border-bottom: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .dayViewTitle {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .timeSlotRow {
+  border-bottom: 1px solid var(--admin-border-subtle) !important;
+}
+
+:global(html[data-theme="light"]) .timeSlotTime {
+  color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .timeSlotEvent {
+  background: var(--admin-input-bg) !important;
+  border: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .timeSlotEvent:hover {
+  border-color: var(--admin-gold) !important;
+  background: var(--admin-gold-hover) !important;
+}
+
+:global(html[data-theme="light"]) .timeSlotEventName {
+  color: var(--admin-text-main) !important;
+}
+
+:global(html[data-theme="light"]) .timeSlotEventMeta {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .modal {
+  background: #ffffff !important;
+  border: 1px solid var(--admin-border) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15) !important;
+}
+
+:global(html[data-theme="light"]) .modalHeader {
+  background: var(--admin-table-hdr-bg) !important;
+  border-bottom: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .modalHeader h3 {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .modalFooter {
+  background: var(--admin-table-hdr-bg) !important;
+  border-top: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .detailCard {
+  background: var(--admin-input-bg) !important;
+  border: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .detailLabel {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .detailValue {
+  color: var(--admin-text-main) !important;
+}
+
+:global(html[data-theme="light"]) .detailValue.highlight {
+  color: var(--admin-gold) !important;
+}
+

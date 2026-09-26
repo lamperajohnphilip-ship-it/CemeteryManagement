@@ -10,6 +10,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(newPath, request.url), 308);
   }
 
+  // ── Redirect Admin Root to Cemetery Overview ──────────────────────────────
+  if (pathname === '/admin' || pathname === '/admin/') {
+    return NextResponse.redirect(new URL('/admin/cemetery-overview', request.url), 307);
+  }
+
   // ── Admin Route Protection Guard ──────────────────────────────────────────
   const isAdminPage = pathname.startsWith('/admin') && pathname !== '/admin-log';
   const isAdminApi = pathname.startsWith('/api/admin');

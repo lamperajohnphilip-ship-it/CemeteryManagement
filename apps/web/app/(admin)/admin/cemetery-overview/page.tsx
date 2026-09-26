@@ -2,16 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import styles from './page.module.css';
+import { getDeceasedRecords } from '../../../actions/deceased';
+import { getPendingInquiriesCount } from '../../../actions/inquiry';
 
 interface DeceasedRecord {
   id: string;
   REF_NO: string;
   NAME_OF_DECEASED: string;
   PAYORS_NAME: string;
-  DATE_OF_DEATH: string;
+  DATE_OF_DEATH: string | Date;
   STATUS: string;
   PAID: number;
-  createdAt: string;
+  createdAt: string | Date;
 }
 
 export default function AdminDashboardPage() {
@@ -26,18 +28,17 @@ export default function AdminDashboardPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // ── Fetch deceased records from the real database ───────
-      const res = await fetch('/api/deceased');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.records)) {
-        setRecords(data.records);
+      const [recordsRes, inquiriesRes] = await Promise.allSettled([
+        getDeceasedRecords(),
+        getPendingInquiriesCount(),
+      ]);
+
+      if (recordsRes.status === 'fulfilled' && recordsRes.value?.success && Array.isArray(recordsRes.value.records)) {
+        setRecords(recordsRes.value.records as any);
       }
 
-      // ── Fetch pending inquiries count ───────────────────────
-      const iqRes = await fetch('/api/inquiries/pending-count');
-      if (iqRes.ok) {
-        const iqData = await iqRes.json();
-        if (iqData.success) setPendingInquiriesCount(iqData.count ?? 0);
+      if (inquiriesRes.status === 'fulfilled' && inquiriesRes.value?.success && typeof inquiriesRes.value.count === 'number') {
+        setPendingInquiriesCount(inquiriesRes.value.count);
       }
     } catch (e) {
       console.error('Failed to load dashboard data:', e);
@@ -60,25 +61,29 @@ export default function AdminDashboardPage() {
     return                      { text: 'Unpaid',  cls: styles.badgePending };
   };
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr: string | Date | undefined) => {
     if (!dateStr) return '—';
     try {
       return new Date(dateStr).toLocaleDateString('en-PH', {
         year: 'numeric', month: 'short', day: 'numeric',
       });
     } catch {
-      return dateStr;
+      return String(dateStr);
     }
   };
 
-  const timeAgo = (dateStr: string) => {
+  const timeAgo = (dateStr: string | Date | undefined) => {
     if (!dateStr) return '—';
-    const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
-    if (days === 0) return 'Today';
-    if (days === 1) return 'Yesterday';
-    if (days < 7)  return `${days} days ago`;
-    if (days < 30) return `${Math.floor(days / 7)} week${Math.floor(days / 7) > 1 ? 's' : ''} ago`;
-    return formatDate(dateStr);
+    try {
+      const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+      if (days === 0) return 'Today';
+      if (days === 1) return 'Yesterday';
+      if (days < 7)  return `${days} days ago`;
+      if (days < 30) return `${Math.floor(days / 7)} week${Math.floor(days / 7) > 1 ? 's' : ''} ago`;
+      return formatDate(dateStr);
+    } catch {
+      return '—';
+    }
   };
 
   return (

@@ -59,6 +59,7 @@ export default function InquiriesPage() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [filteredInquiries, setFilteredInquiries] = useState<Inquiry[]>([]);
   const [currentFilter, setCurrentFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -165,18 +166,22 @@ export default function InquiriesPage() {
         return a.status === currentFilter;
       });
     }
+    if (categoryFilter !== 'all') {
+      result = result.filter(a => a.reason === categoryFilter);
+    }
     if (searchTerm) {
       const t = searchTerm.toLowerCase();
       result = result.filter(a =>
         a.fullName?.toLowerCase().includes(t) ||
         a.ref?.toLowerCase().includes(t) ||
         a.email?.toLowerCase().includes(t) ||
-        a.deceased?.toLowerCase().includes(t)
+        a.deceased?.toLowerCase().includes(t) ||
+        a.reason?.toLowerCase().includes(t)
       );
     }
     setFilteredInquiries(result);
     setCurrentPage(1);
-  }, [inquiries, currentFilter, searchTerm]);
+  }, [inquiries, currentFilter, categoryFilter, searchTerm]);
 
   /* ── Counts ── */
   const counts = {
@@ -330,7 +335,7 @@ export default function InquiriesPage() {
   /* ── Export CSV ── */
   const exportCSV = () => {
     if (inquiries.length === 0) { alert('No inquiries to export.'); return; }
-    const headers = ['REF. NO.', 'FULL NAME', 'EMAIL', 'EMAIL VERIFIED', 'CONTACT', 'DECEASED', 'PLOT', 'DATE', 'TIME', 'STATUS', 'RELATION', 'REASON', 'NOTES'];
+    const headers = ['REF. NO.', 'FULL NAME', 'EMAIL', 'EMAIL VERIFIED', 'CONTACT', 'DECEASED', 'PLOT', 'DATE', 'TIME', 'STATUS', 'RELATION', 'INQUIRY CATEGORY', 'NOTES'];
     const rows = inquiries.map(a =>
       [a.ref, a.fullName, a.email, a.emailVerified ? 'YES' : 'NO', a.phone, a.deceased, a.plot,
         a.preferredDate, a.preferredTime, a.status, a.relation, a.reason, a.notes]
@@ -479,6 +484,19 @@ export default function InquiriesPage() {
                 id="inq-search"
               />
             </div>
+            <select
+              className={styles.btnOutline}
+              value={categoryFilter}
+              onChange={e => setCategoryFilter(e.target.value)}
+              title="Filter by inquiry category"
+              style={{ cursor: 'pointer', minWidth: '160px', padding: '6px 10px', fontSize: '0.8rem' }}
+            >
+              <option value="all">All Categories</option>
+              <option value="Payment Inquiries">💳 Payment Inquiries</option>
+              <option value="Burial">⚰️ Burial</option>
+              <option value="Certificate for Transfer">📜 Certificate for Transfer</option>
+              <option value="Other Inquiries">💬 Other Inquiries</option>
+            </select>
             <button className={styles.btnOutline} onClick={() => { setEmailLogsModal(true); loadEmailLogs(); }} title="View email delivery logs">
               <IconMail /> Email Logs
             </button>
@@ -519,7 +537,7 @@ export default function InquiriesPage() {
                 <th>Deceased / Plot</th>
                 <th>Schedule</th>
                 <th>Contact</th>
-                <th>Request Type</th>
+                <th>Inquiry Category</th>
                 <th style={{ textAlign: 'center' }}>Actions</th>
               </tr>
             </thead>
@@ -924,8 +942,8 @@ export default function InquiriesPage() {
                     <span className={styles.detailCardValue}>{app.preferredTime || '—'}</span>
                   </div>
                   <div className={`${styles.detailCard} ${styles.fullWidth}`}>
-                    <span className={styles.detailCardLabel}>Request Type / Reason</span>
-                    <span className={styles.detailCardValue}>{app.reason || '—'}</span>
+                    <span className={styles.detailCardLabel}>Inquiry Category</span>
+                    <span className={`${styles.detailCardValue} ${styles.highlight}`}>{app.reason || '—'}</span>
                   </div>
                   <div className={`${styles.detailCard} ${styles.fullWidth}`}>
                     <span className={styles.detailCardLabel}>Additional Notes</span>

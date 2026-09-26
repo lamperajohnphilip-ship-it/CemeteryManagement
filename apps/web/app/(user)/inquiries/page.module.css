@@ -1580,3 +1580,231 @@
     gap: 0.2rem;
   }
 }
+
+/* ========================================================
+   Time Slot Grid — Schedule Availability
+   ======================================================== */
+.slotHint {
+  font-size: 0.82rem;
+  color: rgba(232, 224, 208, 0.45);
+  font-style: italic;
+  padding: 14px 16px;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px dashed rgba(201, 168, 76, 0.15);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.timeSlotGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.timeSlotBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(201, 168, 76, 0.15);
+  background: rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.timeSlotBtn:hover:not(:disabled) {
+  border-color: rgba(201, 168, 76, 0.4);
+  background: rgba(201, 168, 76, 0.06);
+}
+
+.timeSlotSelected {
+  border-color: var(--gold, #C9A84C) !important;
+  background: rgba(201, 168, 76, 0.12) !important;
+  box-shadow: 0 0 0 2px rgba(201, 168, 76, 0.2);
+}
+
+.timeSlotBooked {
+  border-color: rgba(248, 113, 113, 0.25) !important;
+  background: rgba(248, 113, 113, 0.06) !important;
+  cursor: not-allowed !important;
+  opacity: 0.7;
+}
+
+.timeSlotBooked .timeSlotLabel {
+  text-decoration: line-through;
+  color: rgba(232, 224, 208, 0.3);
+}
+
+.timeSlotBooked .timeSlotStatus {
+  color: #f87171;
+}
+
+.timeSlotPending {
+  border-color: rgba(230, 176, 100, 0.25);
+  background: rgba(230, 176, 100, 0.04);
+}
+
+.timeSlotPending .timeSlotStatus {
+  color: #e6b064;
+}
+
+.timeSlotLabel {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--cream, #E8E0D0);
+  letter-spacing: 0.01em;
+}
+
+.timeSlotStatus {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #4ade80;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 500px) {
+  .timeSlotGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ========================================================
+   LIGHT MODE OVERRIDES FOR USER INQUIRIES
+   ======================================================== */
+:global(html[data-theme="light"]) .infoPanel {
+  background: #ffffff !important;
+  border-right: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .infoTitle {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .infoDesc {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .stepsLabel {
+  color: var(--admin-text-dark) !important;
+}
+
+:global(html[data-theme="light"]) .stepTitle {
+  color: var(--admin-text-main) !important;
+}
+
+:global(html[data-theme="light"]) .stepDesc {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .infoFooter {
+  border-top-color: var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .infoFooterLabel {
+  color: var(--admin-text-dark) !important;
+}
+
+:global(html[data-theme="light"]) .infoFooterText {
+  color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .formPanel {
+  background: var(--admin-bg) !important;
+  border-left: 1px solid var(--admin-border) !important;
+  box-shadow: none !important;
+}
+
+:global(html[data-theme="light"]) .progressWrap {
+  background: #ffffff !important;
+  border: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .sectionHeading {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .sectionSubheading {
+  color: var(--admin-text-muted) !important;
+  border-bottom-color: var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .formCard {
+  background: #ffffff !important;
+  border: 1px solid var(--admin-border) !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+:global(html[data-theme="light"]) .reviewBlock {
+  background: var(--admin-input-bg) !important;
+  border: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .reviewRow {
+  border-bottom-color: var(--admin-border-subtle) !important;
+}
+
+:global(html[data-theme="light"]) .reviewKey {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .reviewVal {
+  color: var(--admin-text-main) !important;
+}
+
+:global(html[data-theme="light"]) .slotHint {
+  background: var(--admin-input-bg) !important;
+  border-color: var(--admin-input-border) !important;
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .timeSlotBtn {
+  background: var(--admin-input-bg) !important;
+  border-color: var(--admin-input-border) !important;
+}
+
+:global(html[data-theme="light"]) .timeSlotBtn:hover:not(:disabled) {
+  background: var(--admin-gold-hover) !important;
+  border-color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .timeSlotLabel {
+  color: var(--admin-text-main) !important;
+}
+
+:global(html[data-theme="light"]) .timeSlotSelected {
+  background: var(--admin-gold-hover) !important;
+  border-color: var(--admin-gold) !important;
+  box-shadow: 0 0 0 2px var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .timeSlotBooked {
+  background: rgba(239, 68, 68, 0.06) !important;
+  border-color: rgba(239, 68, 68, 0.25) !important;
+  opacity: 0.75 !important;
+}
+
+:global(html[data-theme="light"]) .timeSlotBooked .timeSlotLabel {
+  color: var(--admin-text-muted) !important;
+  text-decoration: line-through !important;
+}
+
+:global(html[data-theme="light"]) .timeSlotBooked .timeSlotStatus {
+  color: #dc2626 !important;
+}
+
+:global(html[data-theme="light"]) .timeSlotPending {
+  background: rgba(245, 158, 11, 0.08) !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+:global(html[data-theme="light"]) .timeSlotPending .timeSlotStatus {
+  color: #d97706 !important;
+}
+
+:global(html[data-theme="light"]) .timeSlotStatus {
+  color: #16a34a !important;
+}

@@ -19,12 +19,10 @@ export default function AboutPage() {
 
       <div className={styles.missionVision}>
         <div className={styles.missionCard}>
-          <div className={styles.cardIcon}>🎯</div>
           <div className={styles.cardTitle}>Our Mission</div>
           <div className={styles.cardText}>To provide a seamless, dignified, and efficient cemetery management experience that honors the departed while serving the living with compassion, transparency, and respect.</div>
         </div>
         <div className={styles.visionCard}>
-          <div className={styles.cardIcon}>👁️</div>
           <div className={styles.cardTitle}>Our Vision</div>
           <div className={styles.cardText}>To become the model for digital cemetery management in the Philippines, combining traditional values with modern technology to serve communities better.</div>
         </div>
@@ -34,32 +32,26 @@ export default function AboutPage() {
         <h2 className={styles.sectionTitle}>SYSTEM <span>FEATURES</span></h2>
         <div className={styles.featuresGrid}>
           <div className={styles.featureItem}>
-            <div className={styles.featureIcon}>⚰️</div>
             <div className={styles.featureTitle}>Deceased Inventory</div>
             <div className={styles.featureDesc}>Complete digital registry of all burial records with payment tracking and status updates.</div>
           </div>
           <div className={styles.featureItem}>
-            <div className={styles.featureIcon}>📅</div>
             <div className={styles.featureTitle}>Inquiry System</div>
             <div className={styles.featureDesc}>Online booking for burial services, plot reservations, and records retrieval.</div>
           </div>
           <div className={styles.featureItem}>
-            <div className={styles.featureIcon}>💰</div>
             <div className={styles.featureTitle}>Payment Records</div>
             <div className={styles.featureDesc}>Integrated payment tracking with status indicators (Paid, Partial, Not Yet Paid).</div>
           </div>
           <div className={styles.featureItem}>
-            <div className={styles.featureIcon}>🗺️</div>
             <div className={styles.featureTitle}>Grave Mapping</div>
             <div className={styles.featureDesc}>Visual layout of cemetery plots for easy location and management.</div>
           </div>
           <div className={styles.featureItem}>
-            <div className={styles.featureIcon}>📢</div>
             <div className={styles.featureTitle}>Announcements</div>
             <div className={styles.featureDesc}>Push notifications and announcements for families and visitors.</div>
           </div>
           <div className={styles.featureItem}>
-            <div className={styles.featureIcon}>📱</div>
             <div className={styles.featureTitle}>SMS Notifications</div>
             <div className={styles.featureDesc}>Real-time SMS updates for inquiry confirmations and reminders.</div>
           </div>

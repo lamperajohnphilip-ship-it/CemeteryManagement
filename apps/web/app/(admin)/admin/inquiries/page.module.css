@@ -928,3 +928,133 @@
   .detailGrid { grid-template-columns: 1fr; }
   .statusGrid { grid-template-columns: 1fr; }
 }
+
+/* ========================================================
+   LIGHT MODE OVERRIDES FOR ADMIN INQUIRIES
+   ======================================================== */
+:global(html[data-theme="light"]) .pageHeader h3 {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .pageHeader p {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .statCard {
+  background: var(--admin-card-bg) !important;
+  border: 1px solid var(--admin-border) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
+}
+
+:global(html[data-theme="light"]) .statCardLabel {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .statCardCount {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .panel {
+  background: var(--admin-card-bg) !important;
+  border: 1px solid var(--admin-border) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
+}
+
+:global(html[data-theme="light"]) .panelTitle {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .panelHead {
+  border-bottom: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .filterTabs {
+  background: var(--admin-table-hdr-bg) !important;
+  border-bottom: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .filterTab {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .filterTab:hover {
+  color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .filterTabActive {
+  background: var(--admin-gold) !important;
+  color: #ffffff !important;
+  border-color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .table thead tr {
+  background: var(--admin-table-hdr-bg) !important;
+}
+
+:global(html[data-theme="light"]) .table th {
+  color: var(--admin-gold) !important;
+  border-bottom: 2px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .table tbody tr:hover {
+  background: #f5f0e8 !important;
+}
+
+:global(html[data-theme="light"]) .tableFooter {
+  background: var(--admin-table-hdr-bg) !important;
+  border-top: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .modal {
+  background: #ffffff !important;
+  border: 1px solid var(--admin-border) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15) !important;
+}
+
+:global(html[data-theme="light"]) .modalHeader {
+  background: var(--admin-table-hdr-bg) !important;
+  border-bottom: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .modalHeader h3 {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .modalFooter {
+  background: var(--admin-table-hdr-bg) !important;
+  border-top: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .detailCard {
+  background: var(--admin-input-bg) !important;
+  border: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .detailCardLabel {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .detailCardValue {
+  color: var(--admin-text-main) !important;
+}
+
+:global(html[data-theme="light"]) .detailCardValue.highlight {
+  color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .logsPanel {
+  background: var(--admin-input-bg) !important;
+  border-color: var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .logsTable thead tr {
+  background: var(--admin-table-hdr-bg) !important;
+}
+
+:global(html[data-theme="light"]) .logsTable th {
+  color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .logsTable td {
+  color: var(--admin-text-main) !important;
+}

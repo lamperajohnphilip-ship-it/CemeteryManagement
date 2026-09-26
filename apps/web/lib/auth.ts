@@ -1,5 +1,4 @@
 import { cookies } from 'next/headers';
-import { prisma } from './prisma';
 
 export const SESSION_COOKIE_NAME = 'cemetery_admin_session';
 

@@ -58,6 +58,31 @@ export async function submitInquiry(data: {
       };
     }
 
+    // 3. Double-booking prevention: check if an Accepted inquiry already occupies this slot
+    if (data.BURIAL_DATE && data.TIME) {
+      const targetDate = new Date(data.BURIAL_DATE + 'T00:00:00');
+      const startOfDay = new Date(targetDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(targetDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const conflicting = await prisma.inquiries.findFirst({
+        where: {
+          BURIAL_DATE: { gte: startOfDay, lte: endOfDay },
+          TIME: data.TIME.trim(),
+          STATUS: 'Accepted',
+        },
+        select: { id: true, APP_ID: true },
+      });
+
+      if (conflicting) {
+        return {
+          success: false,
+          message: `This schedule is already booked (Ref: ${conflicting.APP_ID}). Please select another available date and time.`,
+        };
+      }
+    }
+
     const record = await prisma.inquiries.create({
       data: {
         APP_ID: data.APP_ID,
@@ -150,6 +175,33 @@ export async function acceptInquiry(id: number, remarks?: string) {
         message: `Inquiry ${existing.APP_ID} has already been accepted.`,
         record: existing,
       };
+    }
+
+    // Double-booking prevention: check if another Accepted inquiry already has same date+time
+    if (existing.BURIAL_DATE && existing.TIME) {
+      const startOfDay = new Date(existing.BURIAL_DATE);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(existing.BURIAL_DATE);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const conflicting = await prisma.inquiries.findFirst({
+        where: {
+          id: { not: id },
+          BURIAL_DATE: { gte: startOfDay, lte: endOfDay },
+          TIME: existing.TIME,
+          STATUS: 'Accepted',
+        },
+        select: { id: true, APP_ID: true },
+      });
+
+      if (conflicting) {
+        return {
+          success: false,
+          emailSent: false,
+          smsSent: false,
+          message: `Cannot accept — schedule conflict with already-accepted inquiry ${conflicting.APP_ID}. The same date and time is already booked.`,
+        };
+      }
     }
 
     // Atomic database update
@@ -470,3 +522,16 @@ export async function updateInquiryStatus(id: number, status: string, remarks?: 
     return { success: false, message: error.message || 'Failed to update inquiry' };
   }
 }
+
+export async function getPendingInquiriesCount() {
+  try {
+    const count = await prisma.inquiries.count({
+      where: { STATUS: 'Pending' },
+    });
+    return { success: true, count };
+  } catch (error: any) {
+    console.error('Failed to get pending inquiries count:', error);
+    return { success: false, count: 0, message: error.message };
+  }
+}
+

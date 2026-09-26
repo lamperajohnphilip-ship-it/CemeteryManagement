@@ -315,3 +315,210 @@
   @keyframes spin { to { transform:rotate(360deg); } }
 
   @media(max-width:680px){ .main-grid{grid-template-columns:1fr;grid-template-rows:260px 140px 140px 140px;} .card-big{grid-column:1;grid-row:1;} .card-small{grid-column:1;} .v3-body{grid-template-columns:1fr;} .v3-info{display:none;} }
+
+  /* ========================================================
+     LIGHT MODE OVERRIDES FOR USER GRAVE MAPPING
+     ======================================================== */
+  html[data-theme="light"] .mapping-root {
+    background: #f1f5f9;
+    color: #111111;
+  }
+
+  html[data-theme="light"] .mapping-root nav {
+    background: rgba(255, 255, 255, 0.95);
+    border-bottom: 1px solid #e2e8f0;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  }
+
+  html[data-theme="light"] .mapping-root .nav-logo {
+    color: var(--gold);
+  }
+
+  html[data-theme="light"] .mapping-root .nav-title {
+    color: #111111;
+  }
+
+  html[data-theme="light"] .mapping-root .nav-back {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    color: #475569;
+  }
+
+  html[data-theme="light"] .mapping-root .nav-back:hover {
+    background: var(--admin-gold-hover);
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  html[data-theme="light"] .mapping-root .loc-card {
+    background: #ffffff;
+    border-color: #e2e8f0;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  }
+
+  html[data-theme="light"] .mapping-root .card-overlay {
+    background: linear-gradient(to top, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.45) 45%, transparent 70%);
+  }
+
+  html[data-theme="light"] .mapping-root .loc-card:hover .card-overlay {
+    background: linear-gradient(to top, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.6) 55%, rgba(201, 168, 76, 0.05) 100%);
+  }
+
+  html[data-theme="light"] .mapping-root .card-name {
+    color: #111111;
+  }
+
+  html[data-theme="light"] .mapping-root .card-stats {
+    color: #475569;
+  }
+
+  html[data-theme="light"] .mapping-root #view3d {
+    background: #f8fafc;
+  }
+
+  html[data-theme="light"] .mapping-root .v3-nav {
+    background: rgba(255, 255, 255, 0.98);
+    border-bottom-color: #e2e8f0;
+  }
+
+  html[data-theme="light"] .mapping-root .v3-toolbar {
+    background: #f1f5f9;
+    border-bottom-color: #e2e8f0;
+  }
+
+  html[data-theme="light"] .mapping-root .tb-btn {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    color: #334155;
+  }
+
+  html[data-theme="light"] .mapping-root .tb-btn:hover,
+  html[data-theme="light"] .mapping-root .tb-btn.on {
+    border-color: var(--gold);
+    color: var(--gold);
+    background: var(--admin-gold-hover);
+  }
+
+  html[data-theme="light"] .mapping-root .v3-info {
+    background: #ffffff;
+    border-left-color: #e2e8f0;
+  }
+
+  html[data-theme="light"] .mapping-root .v3-info-head {
+    border-bottom-color: #e2e8f0;
+  }
+
+  html[data-theme="light"] .mapping-root .v3-info-name {
+    color: #111111;
+  }
+
+  html[data-theme="light"] .mapping-root .info-section-title {
+    color: #64748b;
+  }
+
+  html[data-theme="light"] .mapping-root .leg-row {
+    color: #334155;
+  }
+
+  html[data-theme="light"] .mapping-root .kv-row {
+    border-bottom-color: #f1f5f9;
+  }
+
+  html[data-theme="light"] .mapping-root .kv-key {
+    color: #64748b;
+  }
+
+  html[data-theme="light"] .mapping-root .kv-val {
+    color: #111111;
+  }
+
+  html[data-theme="light"] .mapping-root .hint-card {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    color: #475569;
+  }
+
+  html[data-theme="light"] .mapping-root .grave-detail-card {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  }
+
+  html[data-theme="light"] .mapping-root .gd-name {
+    color: #111111;
+  }
+
+  html[data-theme="light"] .mapping-root .gd-field-label {
+    color: #64748b;
+  }
+
+  html[data-theme="light"] .mapping-root .gd-field-val {
+    color: #111111;
+  }
+
+  html[data-theme="light"] .mapping-root .grave-popup-overlay {
+    background: rgba(15, 23, 42, 0.45);
+  }
+
+  html[data-theme="light"] .mapping-root .grave-popup {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  }
+
+  html[data-theme="light"] .mapping-root .gp-name {
+    color: #111111;
+  }
+
+  html[data-theme="light"] .mapping-root .gp-field {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+  }
+
+  html[data-theme="light"] .mapping-root .gp-field-label {
+    color: #64748b;
+  }
+
+  html[data-theme="light"] .mapping-root .gp-field-val {
+    color: #111111;
+  }
+
+  html[data-theme="light"] .mapping-root .gp-dates-row {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+  }
+
+  html[data-theme="light"] .mapping-root .gp-birth,
+  html[data-theme="light"] .mapping-root .gp-death {
+    color: #334155;
+  }
+
+  html[data-theme="light"] .mapping-root .gp-close {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    color: #475569;
+  }
+
+  html[data-theme="light"] .mapping-root .pin-label-bubble {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  }
+
+  html[data-theme="light"] .mapping-root .pin-label-name {
+    color: #111111;
+  }
+
+  html[data-theme="light"] .mapping-root .locate-banner {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  }
+
+  html[data-theme="light"] .mapping-root .lb-name {
+    color: #111111;
+  }
+
+  html[data-theme="light"] .mapping-root .lb-text {
+    color: #334155;
+  }

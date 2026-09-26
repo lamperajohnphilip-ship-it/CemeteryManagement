@@ -97,6 +97,7 @@
   font-size: 1.5rem;
   color: var(--gold);
   margin-bottom: 1rem;
+  text-align: center;
 }
 
 .cardText {
@@ -273,3 +274,94 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ========================================================
+   LIGHT MODE OVERRIDES FOR ABOUT US
+   ======================================================== */
+:global(html[data-theme="light"]) .aboutTitle {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .aboutDescription p {
+  color: var(--admin-text-main) !important;
+}
+
+:global(html[data-theme="light"]) .missionCard,
+:global(html[data-theme="light"]) .visionCard {
+  background: #ffffff !important;
+  border: 1px solid var(--admin-border) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+}
+
+:global(html[data-theme="light"]) .cardTitle {
+  color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .cardText {
+  color: var(--admin-text-main) !important;
+}
+
+:global(html[data-theme="light"]) .sectionTitle {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .featureItem {
+  background: #ffffff !important;
+  border: 1px solid var(--admin-border) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
+}
+
+:global(html[data-theme="light"]) .featureItem:hover {
+  background: #fdfcf9 !important;
+  border-color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .featureTitle {
+  color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .featureDesc {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .developersSection {
+  background: var(--admin-bg) !important;
+  border: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .developersTitle {
+  color: var(--admin-header-text) !important;
+}
+
+:global(html[data-theme="light"]) .developerCard {
+  background: #ffffff !important;
+  border: 1px solid var(--admin-border) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
+}
+
+:global(html[data-theme="light"]) .developerCard:hover {
+  background: #fdfcf9 !important;
+  border-color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .developerName {
+  color: var(--admin-text-main) !important;
+}
+
+:global(html[data-theme="light"]) .developerRole {
+  color: var(--admin-gold) !important;
+}
+
+:global(html[data-theme="light"]) .developerDesc {
+  color: var(--admin-text-muted) !important;
+}
+
+:global(html[data-theme="light"]) .footer {
+  background: #ffffff !important;
+  border-top: 1px solid var(--admin-border) !important;
+}
+
+:global(html[data-theme="light"]) .footerText {
+  color: var(--admin-text-muted) !important;
+}
+

@@ -252,7 +252,7 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
               <Text style={[styles.successDetVal, { color: colors.text }]}>{formData.email}</Text>
             </View>
             <View style={styles.successDetRow}>
-              <Text style={styles.successDetKey}>REASON</Text>
+              <Text style={styles.successDetKey}>CATEGORY</Text>
               <Text style={[styles.successDetVal, { color: colors.text }]}>{formData.reason}</Text>
             </View>
             <View style={styles.successDetRow}>
@@ -512,15 +512,13 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
           <Text style={[styles.sectionSubheading, { color: colors.boneMuted }]}>Select your reason for visiting and preferred schedule.</Text>
 
           <View style={[styles.formCard, { backgroundColor: colors.cardBg, borderColor: colors.goldBorder }]}>
-            <Text style={[styles.formLabel, { color: colors.textMuted }]}>Reason for Inquiry <Text style={[styles.req, { color: colors.gold }]}>*</Text></Text>
+            <Text style={[styles.formLabel, { color: colors.textMuted }]}>Inquiry Category <Text style={[styles.req, { color: colors.gold }]}>*</Text></Text>
             <View style={styles.reasonGrid}>
               {[
-                { icon: '⚰️', title: 'BURIAL', value: 'Burial / Interment', desc: 'Schedule a burial' },
-                { icon: '📋', title: 'RESERVATION', value: 'Grave Reservation', desc: 'Reserve a future plot' },
-                { icon: '🔖', title: 'EXHUMATION', value: 'Exhumation Request', desc: 'Request remains transfer' },
-                { icon: '📝', title: 'TRANSFER', value: 'Plot Transfer / Ownership', desc: 'Transfer ownership' },
-                { icon: '🗂️', title: 'RECORDS', value: 'Records Retrieval', desc: 'Official documents' },
-                { icon: '💬', title: 'OTHER', value: 'Other Inquiry', desc: 'General question' }
+                { icon: '💳', title: 'PAYMENT', value: 'Payment Inquiries', desc: 'Payment-related concerns' },
+                { icon: '⚰️', title: 'BURIAL', value: 'Burial', desc: 'Schedule a burial' },
+                { icon: '📜', title: 'CERTIFICATE', value: 'Certificate for Transfer', desc: 'Transfer certificate' },
+                { icon: '💬', title: 'OTHER', value: 'Other Inquiries', desc: 'General question' }
               ].map((r) => (
                 <TouchableOpacity
                   key={r.value}
@@ -534,7 +532,7 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
                 </TouchableOpacity>
               ))}
             </View>
-            {errors.reason && <Text style={[styles.errMsg, { marginTop: 10 }]}>Please select a reason for your inquiry.</Text>}
+            {errors.reason && <Text style={[styles.errMsg, { marginTop: 10 }]}>Please select an inquiry category.</Text>}
 
             <View style={styles.formGroup}>
               <Text style={[styles.formLabel, { color: colors.textMuted }]}>Name of Deceased</Text>
@@ -666,7 +664,7 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
             <View style={[styles.reviewBlock, { backgroundColor: colors.cardBg, borderColor: colors.goldBorder }]}>
               <Text style={[styles.reviewBlockTitle, { color: colors.gold, borderBottomColor: colors.goldBorder }]}>INQUIRY DETAILS</Text>
               <View style={styles.reviewRow}>
-                <Text style={[styles.reviewKey, { color: colors.textMuted }]}>Reason</Text>
+                <Text style={[styles.reviewKey, { color: colors.textMuted }]}>Inquiry Category</Text>
                 <Text style={[styles.reviewVal, { color: colors.text }]}>{formData.reason}</Text>
               </View>
               <View style={styles.reviewRow}>

@@ -85,6 +85,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'CEMETERY OVERVIEW', path: '/admin/cemetery-overview', icon: '⊞' },
     { name: 'DECEASED INFORMATION', path: '/admin/deceased-information', icon: '📋' },
     { name: 'INQUIRIES', path: '/admin/inquiries', icon: '📅' },
+    { name: 'SCHEDULE CALENDAR', path: '/admin/schedule-calendar', icon: '📆' },
     { name: 'GRAVE MAP', path: '/admin/grave-mapping', icon: '🗺' },
     { name: 'SMS NOTIFICATIONS', path: '/admin/sms', icon: '💬' },
     { name: 'ANNOUNCEMENTS', path: '/admin/announcements', icon: '📣' },
