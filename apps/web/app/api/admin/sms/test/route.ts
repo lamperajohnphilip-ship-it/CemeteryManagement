@@ -16,7 +16,10 @@ export async function GET(_req: NextRequest) {
     );
   }
 
-  const rawKey = process.env.SEMAPHORE_API_KEY || '';
+  const rawKey =
+    process.env.SEMAPHORE_API_KEY ||
+    process.env.SEMAPHORE ||
+    '7b6050e0796a02631c5d5887ed34a916';
   const apiKey = rawKey.trim().replace(/^["']|["']$/g, '');
   const senderName = (process.env.SEMAPHORE_SENDER_NAME || 'SEMAPHORE').trim().replace(/^["']|["']$/g, '');
 

@@ -75,7 +75,10 @@ export async function sendSmsNotification(
       };
     }
 
-    const rawApiKey = process.env.SEMAPHORE_API_KEY || '';
+    const rawApiKey =
+      process.env.SEMAPHORE_API_KEY ||
+      process.env.SEMAPHORE ||
+      '7b6050e0796a02631c5d5887ed34a916';
     const rawSender = process.env.SEMAPHORE_SENDER_NAME || 'SEMAPHORE';
 
     const apiKey = rawApiKey.trim().replace(/^["']|["']$/g, '');
