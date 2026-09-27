@@ -119,10 +119,12 @@ function createTransporter() {
     return null;
   }
 
-  // Gmail SMTP configuration
+  // Gmail SMTP configuration (optimized for Vercel Serverless / AWS Lambda)
   if (host.includes('gmail.com') || !process.env.EMAIL_HOST) {
     return nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
       auth: {
         user: user.trim(),
         pass: pass.replace(/\s+/g, ''), // strip any accidental spaces from 16-char app passwords
@@ -130,7 +132,12 @@ function createTransporter() {
       tls: {
         rejectUnauthorized: false,
       },
-    });
+      // Force IPv4 to prevent AWS Lambda / Vercel serverless environments hanging on IPv6 DNS resolution
+      family: 4,
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+    } as any);
   }
 
   return nodemailer.createTransport({
@@ -144,7 +151,11 @@ function createTransporter() {
     tls: {
       rejectUnauthorized: false,
     },
-  });
+    family: 4,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
+  } as any);
 }
 
 /**

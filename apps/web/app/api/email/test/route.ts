@@ -27,16 +27,23 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
+    const isGmail = host.includes('gmail.com');
     const transporter = nodemailer.createTransport({
-      service: host.includes('gmail.com') ? 'gmail' : undefined,
-      host: !host.includes('gmail.com') ? host : undefined,
-      port: !host.includes('gmail.com') ? port : undefined,
-      secure: !host.includes('gmail.com') ? secure : undefined,
+      host: isGmail ? 'smtp.gmail.com' : host,
+      port: isGmail ? 465 : port,
+      secure: isGmail ? true : secure,
+      family: 4,
       auth: {
         user: user.trim(),
         pass: pass.replace(/\s+/g, ''),
       },
-    });
+      tls: {
+        rejectUnauthorized: false,
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+    } as any);
 
     const fromHeader = process.env.EMAIL_FROM || `"Municipality of Jasaan Cemetery Management" <${user}>`;
 
