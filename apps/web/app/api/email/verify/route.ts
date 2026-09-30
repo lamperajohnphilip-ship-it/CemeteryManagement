@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { verifyEmailOtp } from '../../../actions/otp';
 
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -30,14 +33,14 @@ export async function GET(request: Request) {
   } catch (error: any) {
     console.error('API Error in GET email verification link:', error);
     return NextResponse.redirect(
-      new URL('/inquiries?error=' + encodeURIComponent(error.message || 'Verification failed.'), request.url)
+      new URL('/inquiries?error=' + encodeURIComponent(error?.message || 'Verification failed.'), request.url)
     );
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const { email, code } = body;
 
     if (!email || !code) {
@@ -57,7 +60,7 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error('API Error in email verification:', error);
     return NextResponse.json(
-      { success: false, message: error.message || 'Internal server error' },
+      { success: false, message: error?.message || 'Internal server error' },
       { status: 500 }
     );
   }

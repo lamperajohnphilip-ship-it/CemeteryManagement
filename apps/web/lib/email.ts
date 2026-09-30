@@ -84,11 +84,157 @@ export async function recordEmailLog(params: {
 }
 
 /**
+ * Automatically computes the canonical base URL for production and development.
+ * In Vercel environments, VERCEL_PROJECT_PRODUCTION_URL or VERCEL_URL is automatically
+ * available even if NEXT_PUBLIC_APP_URL was not explicitly defined.
+ */
+export function getBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_APP_URL?.trim()) {
+    const url = process.env.NEXT_PUBLIC_APP_URL.trim().replace(/\/+$/, '');
+    return url.startsWith('http') ? url : `https://${url}`;
+  }
+  if (process.env.APP_URL?.trim()) {
+    const url = process.env.APP_URL.trim().replace(/\/+$/, '');
+    return url.startsWith('http') ? url : `https://${url}`;
+  }
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim()) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL.trim().replace(/\/+$/, '')}`;
+  }
+  if (process.env.VERCEL_URL?.trim()) {
+    return `https://${process.env.VERCEL_URL.trim().replace(/\/+$/, '')}`;
+  }
+  return 'http://localhost:3000';
+}
+
+// In-memory cache for Google OAuth2 access token to eliminate repeated token requests in warm serverless instances
+let cachedGmailToken: { token: string; expiresAt: number } | null = null;
+
+/**
+ * Exchanges the Gmail OAuth2 Refresh Token for a short-lived access token via HTTPS.
+ * Caches the token in memory for its duration (typically 3600 seconds).
+ */
+async function getGmailAccessToken(): Promise<string> {
+  const clientId = process.env.GMAIL_CLIENT_ID?.trim();
+  const clientSecret = process.env.GMAIL_CLIENT_SECRET?.trim();
+  const refreshToken = process.env.GMAIL_REFRESH_TOKEN?.trim();
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error(
+      'Missing Gmail OAuth credentials. Ensure GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, and GMAIL_REFRESH_TOKEN are configured in Vercel environment variables.'
+    );
+  }
+
+  // Reuse cached token if valid for at least another 60 seconds
+  if (cachedGmailToken && Date.now() < cachedGmailToken.expiresAt - 60000) {
+    return cachedGmailToken.token;
+  }
+
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const errorDesc = data.error_description || data.error || 'Failed to exchange refresh token';
+    console.error('[Gmail OAuth Error]:', errorDesc);
+    if (data.error === 'invalid_grant') {
+      throw new Error(
+        'Gmail OAuth Refresh Token is expired or revoked. Important: If your Google Cloud OAuth Consent Screen is in "Testing" status, refresh tokens expire in 7 days. Switch your OAuth Consent Screen status to "In Production" to obtain permanent refresh tokens.'
+      );
+    }
+    throw new Error(`Gmail OAuth authentication failed: ${errorDesc}`);
+  }
+
+  const expiresIn = Number(data.expires_in) || 3600;
+  cachedGmailToken = {
+    token: data.access_token,
+    expiresAt: Date.now() + expiresIn * 1000,
+  };
+
+  return data.access_token;
+}
+
+/**
+ * Dispatches an email message directly via the Google Gmail REST API v1 over HTTPS (port 443).
+ * Native HTTPS eliminates outbound SMTP socket hangs, TCP handshake timeouts, and cloud IP throttling.
+ */
+async function sendViaGmailRestApi(options: {
+  from: string;
+  to: string;
+  subject: string;
+  text?: string;
+  html?: string;
+}): Promise<{ success: boolean; messageId: string }> {
+  const accessToken = await getGmailAccessToken();
+
+  // Use nodemailer's streamTransport to construct compliant RFC 2822 MIME message
+  const streamTransporter = nodemailer.createTransport({
+    streamTransport: true,
+    newline: 'windows',
+  });
+
+  const info = await streamTransporter.sendMail({
+    from: options.from,
+    to: options.to,
+    subject: options.subject,
+    text: options.text,
+    html: options.html,
+  });
+
+  const rawBuffer: Buffer = await new Promise<Buffer>((resolve, reject) => {
+    if (Buffer.isBuffer(info.message)) {
+      return resolve(info.message);
+    }
+    const chunks: Buffer[] = [];
+    const stream = info.message as any;
+    stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+    stream.on('end', () => resolve(Buffer.concat(chunks)));
+    stream.on('error', reject);
+  });
+
+  // Base64url encoding (RFC 4648 §5, standard required by Gmail API)
+  const base64UrlMessage = rawBuffer
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  const sendResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ raw: base64UrlMessage }),
+  });
+
+  const sendResult = await sendResponse.json().catch(() => ({}));
+
+  if (!sendResponse.ok) {
+    const errorMsg = sendResult?.error?.message || sendResponse.statusText || 'Gmail API message dispatch failed';
+    console.error('[Gmail API Error]:', errorMsg);
+    throw new Error(`Gmail API error (${sendResponse.status}): ${errorMsg}`);
+  }
+
+  return {
+    success: true,
+    messageId: sendResult.id || `gmail-api-${Date.now()}`,
+  };
+}
+
+/**
  * Creates and returns a Nodemailer transporter configured via environment variables.
- * Supports:
- * 1. Gmail OAuth2 API: GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_SENDER_EMAIL
- * 2. Gmail SMTP (App Password): EMAIL_USER, EMAIL_APP_PASSWORD (or GMAIL_API_KEY)
- * 3. Custom SMTP servers
+ * Used as a fallback if Gmail REST API OAuth credentials are not provided.
  */
 function createTransporter() {
   const oauthUser = process.env.GMAIL_SENDER_EMAIL || process.env.EMAIL_USER;
@@ -109,8 +255,8 @@ function createTransporter() {
     });
   }
 
-  const user = (process.env.EMAIL_USER || process.env.GMAIL_SENDER_EMAIL || process.env.SMTP_USER || 'lamperajohnphilip@gmail.com')?.trim();
-  const pass = (process.env.EMAIL_APP_PASSWORD || process.env.EMAIL_PASSWORD || process.env.GMAIL_API_KEY || process.env.SMTP_PASS || 'ekkejcrefcsbofav')?.trim();
+  const user = (process.env.EMAIL_USER || process.env.GMAIL_SENDER_EMAIL || process.env.SMTP_USER)?.trim();
+  const pass = (process.env.EMAIL_APP_PASSWORD || process.env.EMAIL_PASSWORD || process.env.SMTP_PASS)?.trim();
   const host = (process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com')?.trim();
   const port = parseInt(process.env.EMAIL_PORT || process.env.SMTP_PORT || '465', 10);
   const secure = port === 465;
@@ -119,18 +265,21 @@ function createTransporter() {
     return null;
   }
 
-  // Gmail SMTP configuration
+  // Gmail SMTP configuration with strict serverless timeouts
   if (host.includes('gmail.com') || !process.env.EMAIL_HOST) {
     return nodemailer.createTransport({
       service: 'gmail',
       auth: {
         user: user.trim(),
-        pass: pass.replace(/\s+/g, ''), // strip any accidental spaces from 16-char app passwords
+        pass: pass.replace(/\s+/g, ''),
       },
       tls: {
         rejectUnauthorized: false,
       },
-    });
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 8000,
+    } as any);
   }
 
   return nodemailer.createTransport({
@@ -145,9 +294,9 @@ function createTransporter() {
       rejectUnauthorized: false,
     },
     family: 4,
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
+    connectionTimeout: 5000,
+    greetingTimeout: 5000,
+    socketTimeout: 8000,
   } as any);
 }
 
@@ -155,7 +304,7 @@ function createTransporter() {
  * Returns a properly formatted RFC 5322 "From" header: `"Display Name" <email@domain.com>`.
  */
 export function getEmailSenderHeader(): string {
-  const senderEmail = (process.env.EMAIL_USER || process.env.GMAIL_SENDER_EMAIL || process.env.SMTP_USER || 'lamperajohnphilip@gmail.com').trim();
+  const senderEmail = (process.env.GMAIL_SENDER_EMAIL || process.env.EMAIL_USER || process.env.SMTP_USER || 'noreply@example.com').trim();
   const rawFrom = (process.env.EMAIL_FROM || process.env.SMTP_FROM)?.trim();
   if (!rawFrom) {
     return `"Municipality of Jasaan Cemetery Management System" <${senderEmail}>`;
@@ -171,34 +320,165 @@ export function getEmailSenderHeader(): string {
 }
 
 /**
+ * Unified email dispatcher that automatically selects the fastest, most reliable delivery method:
+ * 1. Gmail REST API (OAuth2 over HTTPS) - Recommended for Vercel Serverless (fastest, no port blocks)
+ * 2. Gmail SMTP (App Password via Nodemailer) - Fallback if OAuth is not configured
+ * 3. Dev Simulator - If credentials missing in development environment
+ */
+export async function sendOutgoingEmail(options: {
+  to: string;
+  subject: string;
+  text?: string;
+  html?: string;
+  emailType?: string;
+  inquiryId?: number | null;
+  inquiryAppId?: string | null;
+}): Promise<{ success: boolean; messageId?: string; error?: string; unconfigured?: boolean; method?: string }> {
+  const fromHeader = getEmailSenderHeader();
+  const recipient = options.to.trim();
+
+  // Check 1: Primary Method - Gmail REST API via OAuth2 HTTPS
+  const hasGmailOauth = !!(
+    process.env.GMAIL_CLIENT_ID &&
+    process.env.GMAIL_CLIENT_SECRET &&
+    process.env.GMAIL_REFRESH_TOKEN
+  );
+
+  if (hasGmailOauth) {
+    try {
+      const res = await sendViaGmailRestApi({
+        from: fromHeader,
+        to: recipient,
+        subject: options.subject,
+        text: options.text,
+        html: options.html,
+      });
+
+      await recordEmailLog({
+        recipient,
+        emailType: options.emailType || 'General',
+        subject: options.subject,
+        status: 'Sent',
+        inquiryId: options.inquiryId,
+        inquiryAppId: options.inquiryAppId,
+      });
+
+      return { success: true, messageId: res.messageId, method: 'Gmail REST API (OAuth2 HTTPS)' };
+    } catch (err: any) {
+      console.error('[Email Send Error - Gmail REST API]:', err?.message || err);
+      // If OAuth failed, try SMTP fallback if configured
+      const hasSmtpFallback = !!(process.env.EMAIL_USER && process.env.EMAIL_APP_PASSWORD);
+      if (!hasSmtpFallback) {
+        await recordEmailLog({
+          recipient,
+          emailType: options.emailType || 'General',
+          subject: options.subject,
+          status: 'Failed',
+          errorMessage: err?.message || 'Gmail REST API failed',
+          inquiryId: options.inquiryId,
+          inquiryAppId: options.inquiryAppId,
+        });
+        return { success: false, error: err?.message || 'Failed to dispatch email via Gmail API' };
+      }
+    }
+  }
+
+  // Check 2: Fallback Method - Nodemailer SMTP
+  const transporter = createTransporter();
+  if (transporter) {
+    try {
+      const info = await transporter.sendMail({
+        from: fromHeader,
+        to: recipient,
+        subject: options.subject,
+        text: options.text,
+        html: options.html,
+      });
+
+      await recordEmailLog({
+        recipient,
+        emailType: options.emailType || 'General',
+        subject: options.subject,
+        status: 'Sent',
+        inquiryId: options.inquiryId,
+        inquiryAppId: options.inquiryAppId,
+      });
+
+      return { success: true, messageId: info.messageId, method: 'Gmail SMTP' };
+    } catch (smtpErr: any) {
+      console.error('[Email Send Error - SMTP]:', smtpErr?.message || smtpErr);
+
+      if (process.env.NODE_ENV !== 'production' && isSmtpAuthError(smtpErr)) {
+        console.warn(`[DEV EMAIL SIMULATOR] Email simulated for ${recipient}. Subject: ${options.subject}`);
+        await recordEmailLog({
+          recipient,
+          emailType: options.emailType || 'General',
+          subject: options.subject,
+          status: 'Sent',
+          errorMessage: '[Dev Mode Simulated] Set Gmail OAuth or Google App Password for real delivery.',
+          inquiryId: options.inquiryId,
+          inquiryAppId: options.inquiryAppId,
+        });
+        return { success: true, messageId: `dev-simulated-${Date.now()}`, method: 'Dev Simulator' };
+      }
+
+      await recordEmailLog({
+        recipient,
+        emailType: options.emailType || 'General',
+        subject: options.subject,
+        status: 'Failed',
+        errorMessage: smtpErr?.message || 'SMTP dispatch failed',
+        inquiryId: options.inquiryId,
+        inquiryAppId: options.inquiryAppId,
+      });
+
+      return { success: false, error: smtpErr?.message || 'SMTP email delivery failed' };
+    }
+  }
+
+  // Check 3: Dev simulator if in development mode
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn(`[DEV EMAIL SIMULATOR] Email simulated for ${recipient}. No email credentials configured.`);
+    await recordEmailLog({
+      recipient,
+      emailType: options.emailType || 'General',
+      subject: options.subject,
+      status: 'Sent',
+      errorMessage: '[Dev Mode Simulated] Set GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN or EMAIL_USER / EMAIL_APP_PASSWORD in .env',
+      inquiryId: options.inquiryId,
+      inquiryAppId: options.inquiryAppId,
+    });
+    return { success: true, messageId: `dev-simulated-${Date.now()}`, method: 'Dev Simulator' };
+  }
+
+  // In production with no credentials:
+  return {
+    success: false,
+    unconfigured: true,
+    error: 'Email service credentials not configured. Please set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, and GMAIL_REFRESH_TOKEN (or EMAIL_USER and EMAIL_APP_PASSWORD) in Vercel environment variables.',
+  };
+}
+
+/**
  * Sends a 6-digit security verification code (OTP) to the user's Gmail address to verify ownership.
+ * Uses 5-minute expiry and supports both manual 6-digit code entry and one-click verification link.
  */
 export async function sendVerificationOtpEmail(
   recipientEmail: string,
   otpCode: string,
   recipientName?: string
-): Promise<{ success: boolean; messageId?: string; error?: string; unconfigured?: boolean }> {
+): Promise<{ success: boolean; messageId?: string; error?: string; unconfigured?: boolean; method?: string }> {
   try {
     if (!recipientEmail || !recipientEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim())) {
       return { success: false, error: 'Invalid recipient email address' };
     }
 
-    const transporter = createTransporter();
-    if (!transporter) {
-      console.warn('[Email OTP] Email credentials not configured. In dev mode OTP is:', otpCode);
-      return {
-        success: false,
-        unconfigured: true,
-        error: 'Email service credentials not configured. Please set EMAIL_USER and EMAIL_APP_PASSWORD.',
-      };
-    }
-
-    const fromHeader = getEmailSenderHeader();
+    const cleanEmail = recipientEmail.trim().toLowerCase();
     const displayName = recipientName ? escapeHtml(recipientName) : 'Applicant';
     const safeOtp = escapeHtml(otpCode);
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000';
-    const verifyLink = `${baseUrl}/api/email/verify?email=${encodeURIComponent(recipientEmail.trim().toLowerCase())}&code=${encodeURIComponent(otpCode.trim())}`;
+    const baseUrl = getBaseUrl();
+    const verifyLink = `${baseUrl}/api/email/verify?email=${encodeURIComponent(cleanEmail)}&code=${encodeURIComponent(otpCode.trim())}`;
 
     const textContent = `Dear ${recipientName || 'Applicant'},
 
@@ -209,7 +489,7 @@ ${otpCode}
 Or click this secure one-click link to verify your email immediately:
 ${verifyLink}
 
-This code and link will expire in 10 minutes. Please enter this code on the inquiry form or click the link above.
+This code and link will expire in 5 minutes. Please enter this code on the inquiry form or click the link above.
 
 If you did not request this verification code, please ignore this email.
 
@@ -260,7 +540,7 @@ Municipality of Jasaan Cemetery Management System
                 <div style="font-family: monospace, Consolas, sans-serif; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #e2c97e;">
                   ${safeOtp}
                 </div>
-                <div style="font-size: 11px; color: #a09888; margin-top: 8px;">⏳ Expires in 10 minutes</div>
+                <div style="font-size: 11px; color: #a09888; margin-top: 8px;">⏳ Expires in 5 minutes</div>
               </div>
 
               <p style="margin: 0 0 16px 0; font-size: 13px; color: #9c9588; text-align: left;">
@@ -283,45 +563,15 @@ Municipality of Jasaan Cemetery Management System
 </html>
 `;
 
-    const info = await transporter.sendMail({
-      from: fromHeader,
-      to: recipientEmail.trim(),
+    return await sendOutgoingEmail({
+      to: cleanEmail,
       subject: `Your Cemetery Inquiry Verification Code: ${otpCode}`,
       text: textContent,
       html: htmlContent,
-    });
-
-    await recordEmailLog({
-      recipient: recipientEmail,
       emailType: 'Verification',
-      subject: `Your Cemetery Inquiry Verification Code: ${otpCode}`,
-      status: 'Sent',
     });
-
-    return { success: true, messageId: info.messageId };
   } catch (error: any) {
     console.error('[Email Service Error - OTP]', error);
-
-    if (process.env.NODE_ENV !== 'production' && isSmtpAuthError(error)) {
-      console.warn(`[DEV EMAIL SIMULATOR] OTP email simulated for ${recipientEmail}. OTP Code: ${otpCode}`);
-      await recordEmailLog({
-        recipient: recipientEmail,
-        emailType: 'Verification',
-        subject: `Your Cemetery Inquiry Verification Code: ${otpCode}`,
-        status: 'Sent',
-        errorMessage: '[Dev Mode Simulated] Set 16-character Google App Password in .env for real Gmail delivery.',
-      });
-      return { success: true, messageId: `dev-simulated-${Date.now()}` };
-    }
-
-    await recordEmailLog({
-      recipient: recipientEmail,
-      emailType: 'Verification',
-      subject: 'Your Cemetery Inquiry Verification Code',
-      status: 'Failed',
-      errorMessage: error?.message || 'Failed to send OTP email',
-    });
-
     return { success: false, error: error?.message || 'Failed to send OTP email' };
   }
 }
@@ -347,17 +597,6 @@ export async function sendInquiryReceivedEmail(
     if (!recipientEmail || !recipientEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim())) {
       return { success: false, error: 'Invalid recipient email address' };
     }
-
-    const transporter = createTransporter();
-    if (!transporter) {
-      return {
-        success: false,
-        unconfigured: true,
-        error: 'Email service credentials (EMAIL_USER and EMAIL_APP_PASSWORD) not configured.',
-      };
-    }
-
-    const fromHeader = getEmailSenderHeader();
 
     const safeAppId = escapeHtml(appId);
     const safeName = escapeHtml(recipientName);
@@ -438,51 +677,17 @@ Municipality of Jasaan Cemetery Management System
 </html>
 `;
 
-    const info = await transporter.sendMail({
-      from: fromHeader,
-      to: recipientEmail.trim(),
+    return await sendOutgoingEmail({
+      to: recipientEmail,
       subject: `Inquiry Received - ${appId} | Municipality of Jasaan Cemetery Office`,
       text: textContent,
       html: htmlContent,
-    });
-
-    await recordEmailLog({
+      emailType: 'Inquiry Received',
       inquiryId: data.inquiryId,
       inquiryAppId: appId,
-      recipient: recipientEmail,
-      emailType: 'Inquiry Received',
-      subject: `Inquiry Received - ${appId} | Municipality of Jasaan Cemetery Office`,
-      status: 'Sent',
     });
-
-    return { success: true, messageId: info.messageId };
   } catch (error: any) {
     console.error('[Email Service Error - Inquiry Received]', error);
-
-    if (process.env.NODE_ENV !== 'production' && isSmtpAuthError(error)) {
-      console.warn(`[DEV EMAIL SIMULATOR] Inquiry Received email simulated for ${data.recipientEmail}.`);
-      await recordEmailLog({
-        inquiryId: data.inquiryId,
-        inquiryAppId: data.appId,
-        recipient: data.recipientEmail,
-        emailType: 'Inquiry Received',
-        subject: `Inquiry Received - ${data.appId} | Municipality of Jasaan Cemetery Office`,
-        status: 'Sent',
-        errorMessage: '[Dev Mode Simulated] Set 16-character Google App Password in .env for real Gmail delivery.',
-      });
-      return { success: true, messageId: `dev-simulated-${Date.now()}` };
-    }
-
-    await recordEmailLog({
-      inquiryId: data.inquiryId,
-      inquiryAppId: data.appId,
-      recipient: data.recipientEmail,
-      emailType: 'Inquiry Received',
-      subject: `Inquiry Received - ${data.appId} | Municipality of Jasaan Cemetery Office`,
-      status: 'Failed',
-      errorMessage: error?.message || 'Failed to send inquiry received email',
-    });
-
     return { success: false, error: error?.message || 'Failed to send inquiry received email' };
   }
 }
@@ -513,30 +718,6 @@ export async function sendInquiryAcceptanceEmail(
         error: `Invalid or missing recipient email address: "${recipientEmail}"`,
       };
     }
-
-    const transporter = createTransporter();
-    if (!transporter) {
-      console.warn(
-        '[Email Service] EMAIL_USER and EMAIL_APP_PASSWORD / EMAIL_PASSWORD are not configured in environment variables.'
-      );
-      await recordEmailLog({
-        inquiryId,
-        inquiryAppId: appId,
-        recipient: recipientEmail,
-        emailType: 'Inquiry Accepted',
-        subject: 'Cemetery Inquiry Successfully Accepted',
-        status: 'Failed',
-        errorMessage: 'Email credentials not configured',
-      });
-      return {
-        success: false,
-        unconfigured: true,
-        error:
-          'Email service credentials not configured. Please set EMAIL_USER and EMAIL_APP_PASSWORD in environment variables.',
-      };
-    }
-
-    const fromHeader = getEmailSenderHeader();
 
     const safeAppId = escapeHtml(appId);
     const safeName = escapeHtml(recipientName);
@@ -695,60 +876,20 @@ cemetery@jasaan.gov.ph
 </html>
 `;
 
-    const info = await transporter.sendMail({
-      from: fromHeader,
-      to: recipientEmail.trim(),
+    return await sendOutgoingEmail({
+      to: recipientEmail,
       subject: 'Cemetery Inquiry Successfully Accepted',
       text: textContent,
       html: htmlContent,
-    });
-
-    await recordEmailLog({
+      emailType: 'Inquiry Accepted',
       inquiryId,
       inquiryAppId: appId,
-      recipient: recipientEmail,
-      emailType: 'Inquiry Accepted',
-      subject: 'Cemetery Inquiry Successfully Accepted',
-      status: 'Sent',
     });
-
-    return {
-      success: true,
-      messageId: info.messageId,
-    };
   } catch (error: any) {
     console.error('[Email Service Error - Inquiry Acceptance]', error);
-
-    if (process.env.NODE_ENV !== 'production' && isSmtpAuthError(error)) {
-      console.warn(`[DEV EMAIL SIMULATOR] Inquiry Acceptance email simulated for ${data.recipientEmail}.`);
-      await recordEmailLog({
-        inquiryId: data.inquiryId,
-        inquiryAppId: data.appId,
-        recipient: data.recipientEmail,
-        emailType: 'Inquiry Accepted',
-        subject: 'Cemetery Inquiry Successfully Accepted',
-        status: 'Sent',
-        errorMessage: '[Dev Mode Simulated] Set 16-character Google App Password in .env for real Gmail delivery.',
-      });
-      return {
-        success: true,
-        messageId: `dev-simulated-${Date.now()}`,
-      };
-    }
-
-    await recordEmailLog({
-      inquiryId: data.inquiryId,
-      inquiryAppId: data.appId,
-      recipient: data.recipientEmail,
-      emailType: 'Inquiry Accepted',
-      subject: 'Cemetery Inquiry Successfully Accepted',
-      status: 'Failed',
-      errorMessage: error?.message || 'Failed to send acceptance email through SMTP.',
-    });
-
     return {
       success: false,
-      error: error?.message || 'Failed to send acceptance email through SMTP.',
+      error: error?.message || 'Failed to send acceptance email.',
     };
   }
 }
@@ -768,27 +909,6 @@ export async function sendInquiryRejectionEmail(
         error: `Invalid or missing recipient email address: "${recipientEmail}"`,
       };
     }
-
-    const transporter = createTransporter();
-    if (!transporter) {
-      await recordEmailLog({
-        inquiryId,
-        inquiryAppId: appId,
-        recipient: recipientEmail,
-        emailType: 'Inquiry Rejected',
-        subject: `Update Regarding Your Cemetery Inquiry - ${appId}`,
-        status: 'Failed',
-        errorMessage: 'Email credentials not configured',
-      });
-      return {
-        success: false,
-        unconfigured: true,
-        error:
-          'Email service credentials not configured. Please set EMAIL_USER and EMAIL_APP_PASSWORD in environment variables.',
-      };
-    }
-
-    const fromHeader = getEmailSenderHeader();
 
     const safeAppId = escapeHtml(appId);
     const safeName = escapeHtml(recipientName);
@@ -929,57 +1049,20 @@ Jasaan, Misamis Oriental
 </html>
 `;
 
-    const info = await transporter.sendMail({
-      from: fromHeader,
-      to: recipientEmail.trim(),
+    return await sendOutgoingEmail({
+      to: recipientEmail,
       subject,
       text: textContent,
       html: htmlContent,
-    });
-
-    await recordEmailLog({
+      emailType: 'Inquiry Rejected',
       inquiryId,
       inquiryAppId: appId,
-      recipient: recipientEmail,
-      emailType: 'Inquiry Rejected',
-      subject,
-      status: 'Sent',
     });
-
-    return { success: true, messageId: info.messageId };
   } catch (error: any) {
     console.error('[Email Service Error - Inquiry Rejection]', error);
-
-    if (process.env.NODE_ENV !== 'production' && isSmtpAuthError(error)) {
-      console.warn(`[DEV EMAIL SIMULATOR] Inquiry Rejection email simulated for ${data.recipientEmail}.`);
-      await recordEmailLog({
-        inquiryId: data.inquiryId,
-        inquiryAppId: data.appId,
-        recipient: data.recipientEmail,
-        emailType: 'Inquiry Rejected',
-        subject: `Update Regarding Your Cemetery Inquiry - ${data.appId}`,
-        status: 'Sent',
-        errorMessage: '[Dev Mode Simulated] Set 16-character Google App Password in .env for real Gmail delivery.',
-      });
-      return {
-        success: true,
-        messageId: `dev-simulated-${Date.now()}`,
-      };
-    }
-
-    await recordEmailLog({
-      inquiryId: data.inquiryId,
-      inquiryAppId: data.appId,
-      recipient: data.recipientEmail,
-      emailType: 'Inquiry Rejected',
-      subject: `Update Regarding Your Cemetery Inquiry - ${data.appId}`,
-      status: 'Failed',
-      errorMessage: error?.message || 'Failed to send rejection email',
-    });
-
     return {
       success: false,
-      error: error?.message || 'Failed to send rejection email through SMTP.',
+      error: error?.message || 'Failed to send rejection email.',
     };
   }
 }
@@ -996,18 +1079,7 @@ export async function sendTestSystemEmail(
       return { success: false, error: 'Please provide a valid recipient email address.' };
     }
 
-    const transporter = createTransporter();
-    if (!transporter) {
-      return {
-        success: false,
-        unconfigured: true,
-        error: 'SMTP credentials are not configured in .env (EMAIL_USER / EMAIL_APP_PASSWORD missing).',
-      };
-    }
 
-    const fromHeader = customSenderName?.trim()
-      ? `"${customSenderName.trim().replace(/"/g, '')}" <${(process.env.EMAIL_USER || process.env.SMTP_USER || 'cemetery@jasaan.gov.ph').trim()}>`
-      : getEmailSenderHeader();
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -1056,20 +1128,18 @@ export async function sendTestSystemEmail(
 </html>
     `;
 
-    const info = await transporter.sendMail({
-      from: fromHeader,
+    return await sendOutgoingEmail({
       to: recipientEmail.trim(),
-      subject: '✓ [Test Email] Cemetery Management System SMTP Notification',
-      text: 'This is a test notification from the Jasaan Cemetery Management System. Your SMTP configuration is working properly.',
+      subject: '✓ [Test Email] Cemetery Management System Notification Gateway',
+      text: 'This is a test notification from the Jasaan Cemetery Management System. Your email gateway configuration is working properly.',
       html: htmlContent,
+      emailType: 'System Test',
     });
-
-    return { success: true, messageId: info.messageId };
   } catch (error: any) {
     console.error('[Email Service Error - Test Email]', error);
     return {
       success: false,
-      error: error?.message || 'Failed to dispatch test email through SMTP.',
+      error: error?.message || 'Failed to dispatch test email.',
     };
   }
 }
@@ -1088,22 +1158,14 @@ export async function sendSystemEmail(
       return false;
     }
 
-    const transporter = createTransporter();
-    if (!transporter) {
-      console.warn('[sendSystemEmail] SMTP transporter unconfigured.');
-      return false;
-    }
-
-    const fromHeader = getEmailSenderHeader();
-
-    await transporter.sendMail({
-      from: fromHeader,
+    const res = await sendOutgoingEmail({
       to: to.trim(),
       subject,
       html: htmlContent,
+      emailType: 'System Notification',
     });
 
-    return true;
+    return res.success;
   } catch (err) {
     console.error('[sendSystemEmail Error]:', err);
     return false;

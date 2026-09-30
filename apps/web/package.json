@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "next dev -H 0.0.0.0 --port 3000",
+    "dev": "next dev -H 192.168.1.22 --port 3000",
     "build": "next build",
     "start": "next start",
     "lint": "eslint --max-warnings 0",
@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@repo/ui": "workspace:*",
+    "@supabase/supabase-js": "^2.117.2",
     "next": "16.1.5",
     "nodemailer": "^9.0.5",
     "react": "^19.2.0",

@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import { sendEmailOtp } from '../../../actions/otp';
 
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const { email, name } = body;
 
     if (!email || !email.trim()) {
@@ -21,9 +24,9 @@ export async function POST(request: Request) {
       return NextResponse.json(result, { status: 400 });
     }
   } catch (error: any) {
-    console.error('API Error in send-verification:', error);
+    console.error('[API Error send-verification]:', error?.message || error);
     return NextResponse.json(
-      { success: false, message: error.message || 'Internal server error' },
+      { success: false, message: error?.message || 'Internal server error' },
       { status: 500 }
     );
   }

@@ -5,18 +5,28 @@ import { prisma } from '../../lib/prisma';
 import { sendVerificationOtpEmail } from '../../lib/email';
 
 /**
- * Sends a 6-digit verification code to the specified email address.
- * Enforces rate limiting (45s cooldown) and stores the SHA-256 hash of the code in the DB.
+ * Sends a secure 6-digit verification code (OTP) to the specified email address.
+ * 
+ * Production & Vercel Compatibility Features:
+ * 1. Enforces rate limiting (45s cooldown) per email.
+ * 2. Invalidates all previous active OTPs for the email before generating a new one.
+ * 3. Uses cryptographically secure random number generation (crypto.randomInt).
+ * 4. Stores SHA-256 hash, attempts count, and a 5-minute expiration in Supabase PostgreSQL.
+ * 5. Dispatches via Gmail REST API over HTTPS (with automatic fallback to SMTP).
+ * 6. Never exposes raw OTP or credentials in production logs or client responses.
  */
 export async function sendEmailOtp(email: string, name?: string) {
   try {
-    if (!email || !email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    if (!email || !email.trim()) {
       return { success: false, message: 'Please provide a valid email address.' };
     }
 
     const cleanEmail = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return { success: false, message: 'Please provide a valid email address.' };
+    }
 
-    // Check rate limit: 45 seconds cooldown
+    // Rate Limiting: 45-second cooldown between requests from the same email
     const recentVerification = await prisma.emailVerification.findFirst({
       where: { email: cleanEmail },
       orderBy: { createdAt: 'desc' },
@@ -29,17 +39,29 @@ export async function sendEmailOtp(email: string, name?: string) {
         return {
           success: false,
           rateLimited: true,
-          message: `A code was already sent. Please wait ${waitSeconds}s before requesting a new one, or enter the code already sent to your email.`,
+          message: `A code was recently sent. Please wait ${waitSeconds}s before requesting a new one.`,
         };
       }
     }
 
-    // Generate random 6-digit numeric code
-    const otpCode = String(Math.floor(100000 + Math.random() * 900000));
-    const codeHash = crypto.createHash('sha256').update(otpCode).digest('hex');
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+    // Invalidate all previous unverified OTPs for this email to prevent multiple concurrent active codes
+    await prisma.emailVerification.updateMany({
+      where: {
+        email: cleanEmail,
+        verifiedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      data: {
+        expiresAt: new Date(), // Expire immediately
+      },
+    });
 
-    // Save hashed code in DB
+    // Generate cryptographically secure random 6-digit numeric code (100000 - 999999)
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
+    const codeHash = crypto.createHash('sha256').update(otpCode).digest('hex');
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiration
+
+    // Persist hashed OTP record in Supabase database
     await prisma.emailVerification.create({
       data: {
         email: cleanEmail,
@@ -49,13 +71,12 @@ export async function sendEmailOtp(email: string, name?: string) {
       },
     });
 
-    // Log OTP in server terminal for easy local testing & debugging
-    console.log(`\n==============================================`);
-    console.log(`[EMAIL OTP CODE] Recipient: ${cleanEmail}`);
-    console.log(`[EMAIL OTP CODE] 6-Digit Code: ${otpCode}`);
-    console.log(`==============================================\n`);
+    // In development mode only, log for debugging convenience
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[DEV OTP LOG] Recipient: ${cleanEmail} | OTP: ${otpCode}`);
+    }
 
-    // Send email to the user
+    // Send email via Gmail REST API / SMTP
     const emailResult = await sendVerificationOtpEmail(cleanEmail, otpCode, name);
 
     if (emailResult.success) {
@@ -64,12 +85,21 @@ export async function sendEmailOtp(email: string, name?: string) {
         message: `A 6-digit verification code has been sent to ${cleanEmail}. Please check your inbox (and spam folder).`,
       };
     } else {
-      console.warn(`[OTP Notification] Email delivery encountered issue (${emailResult.error}). Code for ${cleanEmail} is: ${otpCode}`);
+      console.error(`[OTP Error] Failed to send email to ${cleanEmail}:`, emailResult.error);
+
+      // In development mode, allow simulator fallback if email gateway is unconfigured
+      if (process.env.NODE_ENV !== 'production') {
+        return {
+          success: true,
+          devMode: true,
+          devCode: otpCode,
+          message: `[Dev Mode] Verification code generated: ${otpCode}. (Configure Gmail API / App Password for live delivery)`,
+        };
+      }
+
       return {
-        success: true,
-        devMode: true,
-        devCode: otpCode,
-        message: `A 6-digit verification code has been sent to ${cleanEmail}. Please check your inbox and spam folder (Verification code: ${otpCode}).`,
+        success: false,
+        message: emailResult.error || 'Failed to deliver verification code. Please check your email settings or try again.',
       };
     }
   } catch (error: any) {
@@ -79,8 +109,14 @@ export async function sendEmailOtp(email: string, name?: string) {
 }
 
 /**
- * Verifies a 6-digit verification code for an email address.
- * Validates against the SHA-256 hashed code in the DB and marks verifiedAt on success.
+ * Verifies a 6-digit verification code against the Supabase database.
+ * 
+ * Security features:
+ * 1. Sanitizes inputs and validates 6-digit numeric format.
+ * 2. Compares SHA-256 hash server-side.
+ * 3. Enforces a maximum of 5 attempts before locking out the OTP.
+ * 4. Checks that the OTP is active and not expired (5-minute window).
+ * 5. Marks verifiedAt timestamp in the database upon successful verification.
  */
 export async function verifyEmailOtp(email: string, inputCode: string) {
   try {
@@ -95,7 +131,7 @@ export async function verifyEmailOtp(email: string, inputCode: string) {
       return { success: false, message: 'Verification code must be exactly 6 digits.' };
     }
 
-    // Find the latest active verification record for this email
+    // Find the latest active unverified record for this email
     const record = await prisma.emailVerification.findFirst({
       where: {
         email: cleanEmail,
@@ -108,18 +144,24 @@ export async function verifyEmailOtp(email: string, inputCode: string) {
     if (!record) {
       return {
         success: false,
-        message: 'No active verification code found for this email or it has expired. Please request a new code.',
+        message: 'No active verification code found or it has expired (codes expire after 5 minutes). Please request a new code.',
       };
     }
 
+    // Check maximum attempts limit (5 attempts maximum)
     if (record.attempts >= 5) {
+      // Invalidate the code
+      await prisma.emailVerification.update({
+        where: { id: record.id },
+        data: { expiresAt: new Date() },
+      });
       return {
         success: false,
-        message: 'Too many incorrect attempts. Please request a new verification code.',
+        message: 'Too many incorrect attempts (5/5). This code has been invalidated. Please request a new code.',
       };
     }
 
-    // Check code hash
+    // Compute SHA-256 hash of user input
     const inputHash = crypto.createHash('sha256').update(cleanCode).digest('hex');
 
     if (record.codeHash !== inputHash) {
@@ -134,12 +176,12 @@ export async function verifyEmailOtp(email: string, inputCode: string) {
         success: false,
         message:
           remaining > 0
-            ? `Incorrect verification code. (${remaining} attempt${remaining === 1 ? '' : 's'} remaining).`
+            ? `Incorrect verification code (${remaining} attempt${remaining === 1 ? '' : 's'} remaining).`
             : 'Too many incorrect attempts. Please request a new verification code.',
       };
     }
 
-    // Mark as verified
+    // Code is valid: mark as verified in Supabase
     await prisma.emailVerification.update({
       where: { id: record.id },
       data: { verifiedAt: new Date() },
@@ -157,6 +199,7 @@ export async function verifyEmailOtp(email: string, inputCode: string) {
 
 /**
  * Checks if an email was verified within the past given minutes (defaults to 120 minutes / 2 hours).
+ * Used server-side before processing submissions (e.g., in submitInquiry).
  */
 export async function isEmailVerifiedRecently(email: string, maxAgeMinutes = 120): Promise<boolean> {
   if (!email || !email.trim()) return false;
@@ -178,7 +221,7 @@ export async function isEmailVerifiedRecently(email: string, maxAgeMinutes = 120
 
 /**
  * Verifies and certifies an email address via Google Sign-In identity authentication.
- * Stores a verified record in the database for 24 hours so the user can complete their inquiry.
+ * Stores a verified record in the database for 24 hours so the citizen can complete their inquiry.
  */
 export async function verifyWithGoogleAccount(params: { email: string; name?: string }) {
   try {
@@ -189,7 +232,18 @@ export async function verifyWithGoogleAccount(params: { email: string; name?: st
 
     const cleanEmail = email.trim().toLowerCase();
 
-    // Create a verified entry in database
+    // Invalidate previous unverified records
+    await prisma.emailVerification.updateMany({
+      where: {
+        email: cleanEmail,
+        verifiedAt: null,
+      },
+      data: {
+        expiresAt: new Date(),
+      },
+    });
+
+    // Create a verified entry in the database
     await prisma.emailVerification.create({
       data: {
         email: cleanEmail,
@@ -200,7 +254,9 @@ export async function verifyWithGoogleAccount(params: { email: string; name?: st
       },
     });
 
-    console.log(`[GOOGLE AUTH VERIFIED] Account verified: ${cleanEmail} (${name || 'Citizen User'})`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[GOOGLE AUTH VERIFIED] Account verified: ${cleanEmail} (${name || 'Citizen User'})`);
+    }
 
     return {
       success: true,
@@ -212,4 +268,3 @@ export async function verifyWithGoogleAccount(params: { email: string; name?: st
     return { success: false, message: error.message || 'Google verification failed.' };
   }
 }
-
