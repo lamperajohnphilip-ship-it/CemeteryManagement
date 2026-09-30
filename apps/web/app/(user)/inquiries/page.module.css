@@ -1579,7 +1579,30 @@
     flex-direction: column;
     gap: 0.2rem;
   }
+
+  .emailInputWrap {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .btnSendOtp {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .otpInputsRow {
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .btnVerifyOtp {
+    width: 100%;
+    justify-content: center;
+  }
 }
+
 
 /* ========================================================
    Time Slot Grid — Schedule Availability

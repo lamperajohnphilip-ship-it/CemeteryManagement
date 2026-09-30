@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -44,6 +44,116 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
   const [isSuccess, setIsSuccess] = useState(false);
   const [refNum, setRefNum] = useState('');
 
+  // OTP Email Verification States (Mobile View)
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpMessage, setOtpMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown(prev => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  const handleSendOtp = async () => {
+    const email = formData.email.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErrors(prev => ({ ...prev, email: true }));
+      setOtpMessage({ text: 'Please enter a valid email address first.', type: 'error' });
+      return;
+    }
+
+    setIsSendingOtp(true);
+    setOtpMessage({ text: 'Sending 6-digit verification code to your Gmail…', type: 'info' });
+
+    try {
+      const applicantName = `${formData.firstName} ${formData.lastName}`.trim() || undefined;
+      const res = await fetch(`${baseUrl}/api/email/send-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name: applicantName }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setOtpSent(true);
+        setResendCooldown(45);
+        setOtpMessage({
+          text: data.message || `A 6-digit verification code has been sent to ${email}. Check your inbox and spam folder.`,
+          type: 'success',
+        });
+      } else {
+        setOtpMessage({
+          text: data.message || 'Failed to send verification code. Please check your email.',
+          type: 'error',
+        });
+      }
+    } catch (err: any) {
+      setOtpMessage({
+        text: err?.message || 'Error communicating with verification service.',
+        type: 'error',
+      });
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    const email = formData.email.trim();
+    const cleanCode = otpCode.trim().replace(/\s+/g, '');
+
+    if (!cleanCode || cleanCode.length !== 6) {
+      setOtpMessage({ text: 'Please enter the 6-digit verification code.', type: 'error' });
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    setOtpMessage({ text: 'Verifying code…', type: 'info' });
+
+    try {
+      const res = await fetch(`${baseUrl}/api/email/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code: cleanCode }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setIsEmailVerified(true);
+        setOtpMessage({
+          text: '✅ Email verified successfully! You can now proceed with your inquiry.',
+          type: 'success',
+        });
+        setErrors(prev => ({ ...prev, email: false, emailNotVerified: false }));
+      } else {
+        setOtpMessage({
+          text: data.message || 'Incorrect verification code. Please try again.',
+          type: 'error',
+        });
+      }
+    } catch (err: any) {
+      setOtpMessage({
+        text: err?.message || 'Error verifying code. Please try again.',
+        type: 'error',
+      });
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  const handleChangeEmail = () => {
+    setIsEmailVerified(false);
+    setOtpSent(false);
+    setOtpCode('');
+    setOtpMessage(null);
+  };
+
   // Feedback states on inquiry finish
   const [feedbackRating, setFeedbackRating] = useState(5);
   const [feedbackComment, setFeedbackComment] = useState('');
@@ -83,8 +193,14 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
   ];
 
   const handleInputChange = (field: string, value: any) => {
+    if (field === 'email') {
+      setIsEmailVerified(false);
+      setOtpSent(false);
+      setOtpCode('');
+      setOtpMessage(null);
+    }
     setFormData({ ...formData, [field]: value });
-    setErrors({ ...errors, [field]: false });
+    setErrors({ ...errors, [field]: false, emailNotVerified: false });
   };
 
   const validateStep1 = () => {
@@ -95,6 +211,13 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
     if (!/^[\d\s\-\+]{7,}$/.test(formData.phone.trim())) newErrors.phone = true;
     if (!formData.relation) newErrors.relation = true;
     if (!formData.smsInfo) newErrors.smsInfo = true;
+    if (!isEmailVerified) {
+      newErrors.emailNotVerified = true;
+      setOtpMessage({
+        text: 'Please verify your email address with the 6-digit code before proceeding.',
+        type: 'error',
+      });
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -219,6 +342,11 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
     setFeedbackComment('');
     setSelectedTags([]);
     setFeedbackSubmitted(false);
+    setIsEmailVerified(false);
+    setOtpSent(false);
+    setOtpCode('');
+    setOtpMessage(null);
+    setResendCooldown(0);
     setStep(1);
     setIsSuccess(false);
   };
@@ -411,17 +539,118 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={[styles.formLabel, { color: colors.textMuted }]}>Email Address <Text style={[styles.req, { color: colors.gold }]}>*</Text></Text>
-              <TextInput
-                style={[styles.formInput, { backgroundColor: colors.appBg, borderColor: colors.inputBorder, color: colors.text }, errors.email && styles.formInputErr]}
-                placeholder="e.g. juan@email.com"
-                placeholderTextColor={colors.boneDim}
-                keyboardType="email-address"
-                value={formData.email}
-                onChangeText={(val) => handleInputChange('email', val)}
-                autoCapitalize="none"
-              />
+              <View style={styles.labelRow}>
+                <Text style={[styles.formLabel, { color: colors.textMuted }]}>
+                  Email Address <Text style={[styles.req, { color: colors.gold }]}>*</Text>
+                </Text>
+                {isEmailVerified && (
+                  <Text style={styles.verifiedHeaderBadge}>✓ Verified</Text>
+                )}
+              </View>
+
+              <View style={styles.emailRow}>
+                <TextInput
+                  style={[
+                    styles.formInput,
+                    { backgroundColor: colors.appBg, borderColor: colors.inputBorder, color: colors.text, flex: 1, marginBottom: 0 },
+                    (errors.email || errors.emailNotVerified) && styles.formInputErr,
+                    isEmailVerified && { opacity: 0.7 }
+                  ]}
+                  placeholder="e.g. juan@gmail.com"
+                  placeholderTextColor={colors.boneDim}
+                  keyboardType="email-address"
+                  value={formData.email}
+                  onChangeText={(val) => handleInputChange('email', val)}
+                  autoCapitalize="none"
+                  editable={!isEmailVerified}
+                />
+
+                {!isEmailVerified ? (
+                  <TouchableOpacity
+                    style={[
+                      styles.btnVerifyAction,
+                      { backgroundColor: colors.gold },
+                      (isSendingOtp || !formData.email || resendCooldown > 0) && styles.btnDisabled
+                    ]}
+                    onPress={handleSendOtp}
+                    disabled={isSendingOtp || !formData.email || resendCooldown > 0}
+                    activeOpacity={0.8}
+                  >
+                    {isSendingOtp ? (
+                      <ActivityIndicator size="small" color={colors.stone} />
+                    ) : (
+                      <Text style={[styles.btnVerifyActionText, { color: colors.stone }]}>
+                        {resendCooldown > 0 ? `Wait (${resendCooldown}s)` : otpSent ? 'Resend' : 'Verify'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity style={styles.btnChangeEmail} onPress={handleChangeEmail}>
+                    <Text style={[styles.btnChangeEmailText, { color: colors.gold }]}>Change</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
               {errors.email && <Text style={styles.errMsg}>Please enter a valid email address.</Text>}
+              {errors.emailNotVerified && !isEmailVerified && (
+                <Text style={styles.errMsg}>Please verify your email before proceeding.</Text>
+              )}
+
+              {/* OTP Message Banner */}
+              {otpMessage && (
+                <View style={[
+                  styles.otpBanner,
+                  otpMessage.type === 'success' && styles.otpBannerSuccess,
+                  otpMessage.type === 'error' && styles.otpBannerError,
+                  otpMessage.type === 'info' && styles.otpBannerInfo,
+                ]}>
+                  <Text style={[
+                    styles.otpBannerText,
+                    otpMessage.type === 'success' && { color: '#86efac' },
+                    otpMessage.type === 'error' && { color: '#fca5a5' },
+                    otpMessage.type === 'info' && { color: '#fde047' },
+                  ]}>
+                    {otpMessage.text}
+                  </Text>
+                </View>
+              )}
+
+              {/* OTP Input Card */}
+              {!isEmailVerified && otpSent && (
+                <View style={[styles.otpCard, { backgroundColor: colors.cardBg, borderColor: colors.goldBorder }]}>
+                  <Text style={[styles.otpCardTitle, { color: colors.gold }]}>✉️ Enter 6-Digit Code</Text>
+                  <Text style={[styles.otpCardDesc, { color: colors.boneMuted }]}>
+                    Check your Gmail inbox or spam folder for your 6-digit verification code.
+                  </Text>
+                  <View style={styles.otpInputRow}>
+                    <TextInput
+                      style={[styles.otpDigitInput, { backgroundColor: colors.appBg, borderColor: colors.inputBorder, color: colors.text }]}
+                      placeholder="123456"
+                      placeholderTextColor={colors.boneDim}
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      value={otpCode}
+                      onChangeText={(val) => setOtpCode(val.replace(/\D/g, ''))}
+                    />
+                    <TouchableOpacity
+                      style={[
+                        styles.btnSubmitOtp,
+                        { backgroundColor: colors.gold },
+                        (isVerifyingOtp || otpCode.length !== 6) && styles.btnDisabled
+                      ]}
+                      onPress={handleVerifyOtp}
+                      disabled={isVerifyingOtp || otpCode.length !== 6}
+                      activeOpacity={0.8}
+                    >
+                      {isVerifyingOtp ? (
+                        <ActivityIndicator size="small" color={colors.stone} />
+                      ) : (
+                        <Text style={[styles.btnSubmitOtpText, { color: colors.stone }]}>Confirm</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
             </View>
 
             <View style={styles.formGroup}>
@@ -1220,5 +1449,111 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: 11,
     color: colors.boneDim,
     textAlign: 'center',
+  },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  verifiedHeaderBadge: {
+    color: '#86efac',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  emailRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  btnVerifyAction: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 80,
+  },
+  btnVerifyActionText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+  },
+  btnDisabled: {
+    opacity: 0.5,
+  },
+  btnChangeEmail: {
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+  },
+  btnChangeEmailText: {
+    fontSize: 12,
+    textDecorationLine: 'underline',
+  },
+  otpBanner: {
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  otpBannerSuccess: {
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+    borderColor: 'rgba(34, 197, 94, 0.35)',
+  },
+  otpBannerError: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderColor: 'rgba(239, 68, 68, 0.35)',
+  },
+  otpBannerInfo: {
+    backgroundColor: 'rgba(234, 179, 8, 0.12)',
+    borderColor: 'rgba(234, 179, 8, 0.35)',
+  },
+  otpBannerText: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  otpCard: {
+    marginTop: 10,
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  otpCardTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  otpCardDesc: {
+    fontSize: 11,
+    lineHeight: 15,
+    marginBottom: 10,
+  },
+  otpInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  otpDigitInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 16,
+    letterSpacing: 4,
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  btnSubmitOtp: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnSubmitOtpText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
   },
 });
