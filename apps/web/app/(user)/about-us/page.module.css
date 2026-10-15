@@ -219,6 +219,14 @@
   border-radius: 50%;
 }
 
+.developerImageJp img {
+  object-position: center 18%;
+}
+
+.developerImageHeadshot img {
+  object-position: center 25%;
+}
+
 .developerName {
   font-family: 'Cinzel', serif;
   font-size: 1.1rem;

@@ -2,6 +2,10 @@
 
 import Image from 'next/image';
 import styles from './page.module.css';
+import jpPhoto from './Jp.jpg';
+import jehselPhoto from './jehsel.jpg';
+import lyndiePhoto from './lyndie.jpg';
+import dianePhoto from './diane.jpg';
 
 export default function AboutPage() {
   return (
@@ -62,32 +66,32 @@ export default function AboutPage() {
         <h2 className={styles.developersTitle}>MEET THE DEVELOPERS</h2>
         <div className={styles.developersGrid}>
           <div className={styles.developerCard}>
-            <div className={styles.developerImage}>
-              <Image src="/Jp.jpg" alt="Developer 1" width={120} height={120} />
+            <div className={`${styles.developerImage} ${styles.developerImageJp}`}>
+              <Image src={jpPhoto} alt="John Philip Lampera" width={120} height={120} priority />
             </div>
             <div className={styles.developerName}>John Philip Lampera</div>
             <div className={styles.developerRole}>System Developer</div>
             <div className={styles.developerDesc}>Full-stack developer specializing in cemetery management systems.</div>
           </div>
           <div className={styles.developerCard}>
-            <div className={styles.developerImage}>
-              <Image src="/jehsel.jpg" alt="Developer 2" width={120} height={120} />
+            <div className={`${styles.developerImage} ${styles.developerImageHeadshot}`}>
+              <Image src={jehselPhoto} alt="Jehsel B. Pasion" width={120} height={120} priority />
             </div>
             <div className={styles.developerName}>Jehsel B. Pasion</div>
             <div className={styles.developerRole}>UI/UX Designer</div>
             <div className={styles.developerDesc}>Creating intuitive and dignified user experiences for families.</div>
           </div>
           <div className={styles.developerCard}>
-            <div className={styles.developerImage}>
-              <Image src="/lydnie.jpg" alt="Developer 3" width={120} height={120} />
+            <div className={`${styles.developerImage} ${styles.developerImageHeadshot}`}>
+              <Image src={lyndiePhoto} alt="Lyndie U. Valerio" width={120} height={120} priority />
             </div>
             <div className={styles.developerName}>Lyndie U. Valerio</div>
             <div className={styles.developerRole}>Database Manager</div>
             <div className={styles.developerDesc}>Ensuring data integrity and system reliability.</div>
           </div>
           <div className={styles.developerCard}>
-            <div className={styles.developerImage}>
-              <Image src="/diane.jpg" alt="Developer 4" width={120} height={120} />
+            <div className={`${styles.developerImage} ${styles.developerImageHeadshot}`}>
+              <Image src={dianePhoto} alt="Gracel Diane Bioyo" width={120} height={120} priority />
             </div>
             <div className={styles.developerName}>Gracel Diane Bioyo</div>
             <div className={styles.developerRole}>Project Leader</div>
