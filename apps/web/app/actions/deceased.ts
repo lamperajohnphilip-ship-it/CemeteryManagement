@@ -170,6 +170,33 @@ export async function getDeceasedRecords() {
   }
 }
 
+export async function getCemeteryPublicStats() {
+  try {
+    const totalDeceased = await prisma.deceasedRecord.count({
+      where: { NOT: { isArchived: true } },
+    });
+
+    // Public Cemetery total plot capacity based on master plan (247 plots)
+    const totalCapacity = 247;
+    const occupiedPlots = totalDeceased;
+    const availablePlots = Math.max(0, totalCapacity - occupiedPlots);
+
+    return {
+      success: true,
+      stats: {
+        totalMemorials: totalDeceased,
+        totalDeceased: totalDeceased,
+        occupiedPlots: occupiedPlots,
+        availablePlots: availablePlots,
+        totalCapacity: totalCapacity,
+      },
+    };
+  } catch (error: any) {
+    console.error('Error fetching public cemetery stats:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 export async function getArchivedRecords() {
   try {
     await requireAdmin();
