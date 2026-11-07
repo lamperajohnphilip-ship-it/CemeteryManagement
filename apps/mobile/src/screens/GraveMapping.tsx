@@ -9,10 +9,11 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { themeColors, Theme } from '../../App';
+import { themeColors, Theme } from '../theme/colors';
+import { getBaseUrl } from '../config/api';
 
 interface ScreenProps {
-  baseUrl: string;
+  baseUrl?: string;
   locateGraveData?: any;
   theme?: Theme;
 }
@@ -21,14 +22,19 @@ export default function GraveMapping({ baseUrl, locateGraveData, theme = 'dark' 
   const colors = themeColors[theme];
   const styles = getStyles(colors);
   const [opening, setOpening] = useState(false);
+  const effectiveBaseUrl = (baseUrl || getBaseUrl()).replace(/\/+$/, '');
 
   const mapUrl = locateGraveData
-    ? `${baseUrl}/grave-mapping?locate=${encodeURIComponent(JSON.stringify(locateGraveData))}`
-    : `${baseUrl}/grave-mapping`;
+    ? `${effectiveBaseUrl}/grave-mapping?locate=${encodeURIComponent(JSON.stringify(locateGraveData))}`
+    : `${effectiveBaseUrl}/grave-mapping`;
 
   const openMap = async () => {
     try {
       setOpening(true);
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.open(mapUrl, '_blank');
+        return;
+      }
       const supported = await Linking.canOpenURL(mapUrl);
       if (supported) {
         await Linking.openURL(mapUrl);

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getFeedback, saveFeedback, deleteFeedback } from '../../actions/feedback';
+import { verifyAdminSession } from '../../../lib/auth';
 
 export async function GET() {
   try {
@@ -39,6 +40,15 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    // Enforce role-based server-side authorization: only admins can delete citizen feedback
+    const auth = await verifyAdminSession();
+    if (!auth.success || !auth.session) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Administrator session required.' },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const idStr = searchParams.get('id');
 

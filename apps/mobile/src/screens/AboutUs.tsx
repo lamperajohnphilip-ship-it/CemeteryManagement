@@ -7,10 +7,10 @@ import {
   Image as RNImage, 
   Platform 
 } from 'react-native';
-import { themeColors, Theme } from '../../App';
+import { themeColors, Theme } from '../theme/colors';
 
 interface ScreenProps {
-  baseUrl: string;
+  baseUrl?: string;
   theme?: Theme;
 }
 
@@ -83,7 +83,7 @@ export default function AboutUs({ baseUrl, theme = 'dark' }: ScreenProps) {
       avatarEmoji: '👩‍🎨'
     },
     {
-      imageUri: `${baseUrl}/lydnie.jpg`,
+      imageUri: `${baseUrl}/lyndie.jpg`,
       name: 'Lyndie U. Valerio',
       role: 'Database Manager',
       desc: 'Ensuring data integrity and system reliability.',

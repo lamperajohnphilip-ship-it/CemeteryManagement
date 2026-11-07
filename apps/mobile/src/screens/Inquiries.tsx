@@ -9,10 +9,19 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { themeColors, Theme } from '../../App';
+import { themeColors, Theme } from '../theme/colors';
+import { 
+  trackInquiry, 
+  getScheduleSlots, 
+  sendEmailVerification, 
+  verifyEmailCode, 
+  submitInquiry, 
+  submitFeedback 
+} from '../services/api';
+import { getBaseUrl } from '../config/api';
 
 interface ScreenProps {
-  baseUrl: string;
+  baseUrl?: string;
   theme?: Theme;
 }
 
@@ -44,6 +53,132 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
   const [isSuccess, setIsSuccess] = useState(false);
   const [refNum, setRefNum] = useState('');
 
+  // Inquiry Tracker States
+  const [activeTab, setActiveTab] = useState<'submit' | 'track'>('submit');
+  const [trackAppId, setTrackAppId] = useState('');
+  const [trackContactOrEmail, setTrackContactOrEmail] = useState('');
+  const [isTracking, setIsTracking] = useState(false);
+  const [trackError, setTrackError] = useState<string | null>(null);
+  const [trackResult, setTrackResult] = useState<{
+    APP_ID: string;
+    STATUS: string;
+    FAMILY_NAME?: string;
+    DECEASED?: string;
+    BURIAL_DATE?: string;
+    TIME?: string;
+    REQUESTED_PLOT?: string;
+    reason?: string;
+    remarks?: string;
+    createdAt?: string;
+  } | null>(null);
+
+  const handleTrackInquiry = async (appIdOverride?: string, contactOverride?: string) => {
+    const id = (appIdOverride ?? trackAppId).trim();
+    const contact = (contactOverride ?? trackContactOrEmail).trim();
+
+    if (!id) {
+      setTrackError('Please enter your Application Reference ID (e.g., APP-123456).');
+      return;
+    }
+    if (!contact) {
+      setTrackError('Please enter your email or contact number.');
+      return;
+    }
+
+    setIsTracking(true);
+    setTrackError(null);
+
+    try {
+      const data = await trackInquiry(id, contact, baseUrl || getBaseUrl());
+
+      if (data.success && data.inquiry) {
+        setTrackResult(data.inquiry);
+      } else {
+        setTrackResult(null);
+        setTrackError(data.message || 'No matching inquiry found. Please verify your reference ID and contact details.');
+      }
+    } catch (err: any) {
+      setTrackResult(null);
+      setTrackError(err?.message || 'Unable to connect to cemetery server. Please check your network connection.');
+    } finally {
+      setIsTracking(false);
+    }
+  };
+
+  const getStatusInfo = (status?: string) => {
+    const s = (status || '').toUpperCase();
+    if (s.includes('ACCEPT') || s.includes('CONFIRM') || s.includes('APPROV')) {
+      return {
+        label: s || 'ACCEPTED',
+        color: '#4ade80',
+        bg: 'rgba(34, 197, 94, 0.15)',
+        border: 'rgba(34, 197, 94, 0.4)',
+        icon: '✓',
+        message: 'Your inquiry has been officially accepted. Please arrive at the cemetery office as scheduled.'
+      };
+    }
+    if (s.includes('REJECT') || s.includes('DECLIN') || s.includes('CANCEL')) {
+      return {
+        label: s || 'REJECTED',
+        color: '#f87171',
+        bg: 'rgba(239, 68, 68, 0.15)',
+        border: 'rgba(239, 68, 68, 0.4)',
+        icon: '✕',
+        message: 'This application was declined. Please see admin remarks or contact the cemetery office for guidance.'
+      };
+    }
+    return {
+      label: s || 'PENDING',
+      color: '#facc15',
+      bg: 'rgba(234, 179, 8, 0.15)',
+      border: 'rgba(234, 179, 8, 0.4)',
+      icon: '⏳',
+      message: 'Your inquiry is currently awaiting administrative review and plot verification.'
+    };
+  };
+
+  const formatDateTime = (isoString?: string) => {
+    if (!isoString) return 'N/A';
+    try {
+      const d = new Date(isoString);
+      return isNaN(d.getTime()) ? isoString : d.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return isoString;
+    }
+  };
+
+  // Schedule availability states
+  const [bookedSlots, setBookedSlots] = useState<{ date: string; time: string; status: string }[]>([]);
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+
+  const fetchScheduleForDate = async (dateStr: string) => {
+    if (!dateStr || dateStr.length < 7) { setBookedSlots([]); return; }
+    setIsLoadingSlots(true);
+    try {
+      const month = dateStr.substring(0, 7); // 'YYYY-MM'
+      const schedules = await getScheduleSlots(month, baseUrl || getBaseUrl());
+      setBookedSlots(schedules);
+    } catch (_) {}
+    setIsLoadingSlots(false);
+  };
+
+  const getSlotStatus = (date: string, time: string): 'available' | 'accepted' | 'pending' => {
+    for (const slot of bookedSlots) {
+      if (slot.date === date && slot.time === time) {
+        const st = (slot.status || '').toLowerCase();
+        if (st === 'accepted' || st === 'confirmed') return 'accepted';
+        if (st === 'pending' || st === 'in progress') return 'pending';
+      }
+    }
+    return 'available';
+  };
+
   // OTP Email Verification States (Mobile View)
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [isSendingOtp, setIsSendingOtp] = useState(false);
@@ -52,6 +187,30 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
   const [otpCode, setOtpCode] = useState('');
   const [otpMessage, setOtpMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
+
+  // Handle URL email verification if redirected with query params
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const verifiedParam = params.get('verified');
+      const emailParam = params.get('email');
+      const errorParam = params.get('error');
+
+      if (verifiedParam === 'true' && emailParam) {
+        setFormData(prev => ({ ...prev, email: emailParam }));
+        setIsEmailVerified(true);
+        setOtpSent(false);
+        setOtpMessage({
+          text: '✅ Email verified successfully via your secure link! You can now proceed with your inquiry.',
+          type: 'success'
+        });
+        setErrors(prev => ({ ...prev, email: false, emailNotVerified: false }));
+      } else if (errorParam) {
+        if (emailParam) setFormData(prev => ({ ...prev, email: emailParam }));
+        setOtpMessage({ text: decodeURIComponent(errorParam), type: 'error' });
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -73,13 +232,7 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
     setOtpMessage({ text: 'Sending 6-digit verification code to your Gmail…', type: 'info' });
 
     try {
-      const applicantName = `${formData.firstName} ${formData.lastName}`.trim() || undefined;
-      const res = await fetch(`${baseUrl}/api/email/send-verification`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name: applicantName }),
-      });
-      const data = await res.json();
+      const data = await sendEmailVerification(email, baseUrl || getBaseUrl());
 
       if (data.success) {
         setOtpSent(true);
@@ -117,12 +270,7 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
     setOtpMessage({ text: 'Verifying code…', type: 'info' });
 
     try {
-      const res = await fetch(`${baseUrl}/api/email/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code: cleanCode }),
-      });
-      const data = await res.json();
+      const data = await verifyEmailCode(email, cleanCode, baseUrl || getBaseUrl());
 
       if (data.success) {
         setIsEmailVerified(true);
@@ -199,8 +347,21 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
       setOtpCode('');
       setOtpMessage(null);
     }
+    if (field === 'preferredDate' && typeof value === 'string') {
+      fetchScheduleForDate(value);
+      setFormData(prev => ({ ...prev, preferredDate: value, preferredTime: '' }));
+      setErrors(prev => ({ ...prev, preferredDate: false, preferredTime: false, slotBooked: false }));
+      return;
+    }
+    if (field === 'preferredTime' && typeof value === 'string') {
+      const status = getSlotStatus(formData.preferredDate, value);
+      if (status === 'accepted') {
+        setErrors(prev => ({ ...prev, slotBooked: true }));
+        return;
+      }
+    }
     setFormData({ ...formData, [field]: value });
-    setErrors({ ...errors, [field]: false, emailNotVerified: false });
+    setErrors({ ...errors, [field]: false, emailNotVerified: false, slotBooked: false });
   };
 
   const validateStep1 = () => {
@@ -226,8 +387,18 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
   const validateStep2 = () => {
     const newErrors: Record<string, boolean> = {};
     if (!formData.reason) newErrors.reason = true;
-    if (!formData.preferredDate.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(formData.preferredDate.trim())) newErrors.preferredDate = true;
+    if (!formData.preferredDate.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(formData.preferredDate.trim())) {
+      newErrors.preferredDate = true;
+    } else {
+      const today = new Date().toISOString().split('T')[0] || '';
+      if (formData.preferredDate.trim() < today) {
+        newErrors.preferredDate = true;
+      }
+    }
     if (!formData.preferredTime) newErrors.preferredTime = true;
+    if (formData.preferredDate && formData.preferredTime && getSlotStatus(formData.preferredDate, formData.preferredTime) === 'accepted') {
+      newErrors.slotBooked = true;
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -251,36 +422,30 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
     setRefNum(ref);
 
     try {
-      const response = await fetch(`${baseUrl}/api/inquiries`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          APP_ID: ref,
-          FAMILY_NAME: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
-          email: formData.email,
-          CONTACT: formData.phone,
-          relationship: formData.relation,
-          address: formData.address,
-          reason: formData.reason,
-          DECEASED: formData.deceased,
-          REQUESTED_PLOT: formData.plot,
-          BURIAL_DATE: formData.preferredDate,
-          TIME: formData.preferredTime,
-          notes: formData.notes
-        }),
-      });
+      const payload = {
+        APP_ID: ref,
+        FAMILY_NAME: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
+        email: formData.email,
+        CONTACT: formData.phone,
+        relationship: formData.relation,
+        address: formData.address,
+        reason: formData.reason,
+        DECEASED: formData.deceased,
+        REQUESTED_PLOT: formData.plot,
+        BURIAL_DATE: formData.preferredDate,
+        TIME: formData.preferredTime,
+        notes: formData.notes
+      };
 
-      const result = await response.json();
+      const result = await submitInquiry(payload, baseUrl || getBaseUrl());
       if (result.success) {
         setIsSuccess(true);
       } else {
         alert('Failed to submit inquiry: ' + (result.message || 'Unknown error'));
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Inquiry submit error on mobile:', e);
-      alert('Failed to connect to the server. Please try again.');
+      alert(e?.message || 'Failed to connect to the server. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -305,15 +470,11 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
     const fullComment = `${tagText}${feedbackComment}`.trim() || 'Great service experience!';
 
     try {
-      await fetch(`${baseUrl}/api/feedback`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: userName,
-          rating: feedbackRating,
-          comment: fullComment,
-        }),
-      });
+      await submitFeedback({
+        user_id: userName,
+        rating: feedbackRating,
+        comment: fullComment,
+      }, baseUrl || getBaseUrl());
     } catch (err) {
       console.error('Error syncing feedback on mobile:', err);
     } finally {
@@ -353,155 +514,201 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
 
   const progressPercent = (step / totalSteps) * 100;
 
-  if (isSuccess) {
-    return (
-      <ScrollView style={[styles.container, { backgroundColor: colors.appBg }]} contentContainerStyle={styles.scrollContent}>
-        <View style={[styles.successCard, { backgroundColor: colors.cardBg, borderColor: colors.gold }]}>
-          <View style={[styles.successRing, { borderColor: colors.gold }]}>
-            <Text style={[styles.successRingCheck, { color: colors.gold }]}>✓</Text>
-          </View>
-          <Text style={[styles.successTitle, { color: colors.text }]}>INQUIRY SUBMITTED</Text>
-          <Text style={[styles.successSub, { color: colors.textMuted }]}>YOUR REQUEST HAS BEEN RECEIVED</Text>
-
-          <View style={[styles.waitingMessage, { backgroundColor: colors.appBg, borderColor: colors.goldBorder }]}>
-            <Text style={[styles.waitingHighlight, { color: colors.gold }]}>Please wait for admin confirmation</Text>
-            <Text style={[styles.waitingDesc, { color: colors.boneMuted }]}>You will receive a notification once your inquiry is confirmed.</Text>
-          </View>
-
-          <Text style={[styles.successRef, { color: colors.gold, backgroundColor: colors.goldHover }]}>{refNum}</Text>
-
-          <View style={[styles.successDetails, { backgroundColor: colors.appBg }]}>
-            <View style={styles.successDetRow}>
-              <Text style={styles.successDetKey}>NAME</Text>
-              <Text style={[styles.successDetVal, { color: colors.text }]}>{`${formData.firstName} ${formData.lastName}`}</Text>
-            </View>
-            <View style={styles.successDetRow}>
-              <Text style={styles.successDetKey}>EMAIL</Text>
-              <Text style={[styles.successDetVal, { color: colors.text }]}>{formData.email}</Text>
-            </View>
-            <View style={styles.successDetRow}>
-              <Text style={styles.successDetKey}>CATEGORY</Text>
-              <Text style={[styles.successDetVal, { color: colors.text }]}>{formData.reason}</Text>
-            </View>
-            <View style={styles.successDetRow}>
-              <Text style={styles.successDetKey}>DATE</Text>
-              <Text style={[styles.successDetVal, { color: colors.text }]}>{formData.preferredDate}</Text>
-            </View>
-            <View style={styles.successDetRow}>
-              <Text style={styles.successDetKey}>TIME</Text>
-              <Text style={[styles.successDetVal, { color: colors.text }]}>{formData.preferredTime}</Text>
-            </View>
-            <View style={styles.successDetRow}>
-              <Text style={styles.successDetKey}>STATUS</Text>
-              <Text style={[styles.successDetVal, { color: '#facc15', fontWeight: 'bold' }]}>PENDING</Text>
-            </View>
-          </View>
-
-          {/* Inquiry Completion User Feedback Section */}
-          <View style={[styles.feedbackBox, { backgroundColor: colors.appBg, borderColor: colors.goldBorder }]}>
-            {feedbackSubmitted ? (
-              <View style={styles.feedbackSubmittedBox}>
-                <Text style={styles.feedbackSubmittedStars}>{'★'.repeat(feedbackRating)}{'☆'.repeat(5 - feedbackRating)}</Text>
-                <Text style={[styles.feedbackSubmittedTitle, { color: colors.gold }]}>Thank You for Your Feedback!</Text>
-                <Text style={[styles.feedbackSubmittedDesc, { color: colors.boneMuted }]}>
-                  You rated our booking service {feedbackRating}/5 stars. Your review helps us improve cemetery online services for everyone.
-                </Text>
-              </View>
-            ) : (
-              <View>
-                <Text style={[styles.feedbackTitle, { color: colors.gold }]}>⭐ Rate Your Experience</Text>
-                <Text style={[styles.feedbackSub, { color: colors.boneMuted }]}>How was your inquiry booking process?</Text>
-
-                {/* Stars */}
-                <View style={styles.feedbackStarsRow}>
-                  {[1, 2, 3, 4, 5].map(star => (
-                    <TouchableOpacity
-                      key={star}
-                      style={styles.feedbackStarBtn}
-                      onPress={() => setFeedbackRating(star)}
-                    >
-                      <Text style={[styles.feedbackStarText, feedbackRating >= star && styles.feedbackStarActive]}>
-                        ⭐
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {/* Quick Tags */}
-                <View style={styles.feedbackTagsRow}>
-                  {quickFeedbackOptions.map(tag => {
-                    const isSelected = selectedTags.includes(tag);
-                    return (
-                      <TouchableOpacity
-                        key={tag}
-                        style={[
-                          styles.feedbackTag,
-                          { backgroundColor: colors.cardBg, borderColor: colors.divider },
-                          isSelected && [styles.feedbackTagSelected, { borderColor: colors.gold, backgroundColor: colors.goldHover || 'rgba(200, 168, 75, 0.15)' }]
-                        ]}
-                        onPress={() => toggleFeedbackTag(tag)}
-                      >
-                        <Text style={[
-                          styles.feedbackTagText,
-                          { color: colors.boneMuted },
-                          isSelected && [styles.feedbackTagTextSelected, { color: colors.gold }]
-                        ]}>
-                          {isSelected ? '✓ ' : ''}{tag}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {/* Comment Input */}
-                <TextInput
-                  style={[styles.feedbackInput, { backgroundColor: colors.cardBg, borderColor: colors.inputBorder, color: colors.text }]}
-                  placeholder="Additional thoughts or suggestions? (optional)"
-                  placeholderTextColor={colors.boneDim}
-                  value={feedbackComment}
-                  onChangeText={setFeedbackComment}
-                  multiline={true}
-                  numberOfLines={2}
-                />
-
-                {/* Submit Feedback Button */}
-                <TouchableOpacity
-                  style={[styles.feedbackSubmitBtn, { backgroundColor: colors.gold }]}
-                  onPress={handleFeedbackSubmit}
-                  disabled={isSubmittingFeedback}
-                >
-                  <Text style={[styles.feedbackSubmitBtnText, { color: colors.stone }]}>
-                    {isSubmittingFeedback ? 'Submitting...' : 'Submit Feedback'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-
-          <Text style={[styles.successInfo, { color: colors.boneMuted }]}>
-            A confirmation will be sent to your email and mobile number. The cemetery office will review your request within 1–2 business days.
-          </Text>
-
-          <TouchableOpacity style={[styles.btnHome, { borderColor: colors.gold }]} onPress={resetForm}>
-            <Text style={[styles.btnHomeText, { color: colors.gold }]}>Return to Form</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    );
-  }
-
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.appBg }]} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-      {/* Progress Tracker */}
-      <View style={styles.progressWrap}>
-        <View style={styles.progressHeader}>
-          <Text style={[styles.progressLabel, { color: colors.text }]}>{stepLabels[step - 1]}</Text>
-          <Text style={[styles.progressCount, { color: colors.gold }]}>{step} / {totalSteps}</Text>
-        </View>
-        <View style={[styles.progressTrack, { backgroundColor: colors.divider }]}>
-          <View style={[styles.progressFill, { width: `${progressPercent}%`, backgroundColor: colors.gold }]} />
-        </View>
+      {/* Top Tab Switcher */}
+      <View style={[styles.topTabContainer, { borderColor: colors.goldBorder, backgroundColor: colors.cardBg }]}>
+        <TouchableOpacity
+          style={[
+            styles.topTabBtn,
+            activeTab === 'submit' && [styles.topTabBtnActive, { backgroundColor: colors.gold }]
+          ]}
+          onPress={() => setActiveTab('submit')}
+        >
+          <Text style={[
+            styles.topTabBtnText,
+            { color: activeTab === 'submit' ? colors.stone : colors.boneMuted }
+          ]}>
+            📝 SUBMIT INQUIRY
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.topTabBtn,
+            activeTab === 'track' && [styles.topTabBtnActive, { backgroundColor: colors.gold }]
+          ]}
+          onPress={() => setActiveTab('track')}
+        >
+          <Text style={[
+            styles.topTabBtnText,
+            { color: activeTab === 'track' ? colors.stone : colors.boneMuted }
+          ]}>
+            🔍 TRACK STATUS
+          </Text>
+        </TouchableOpacity>
       </View>
+
+      {/* Tab 1: Submit Inquiry */}
+      {activeTab === 'submit' && (
+        isSuccess ? (
+          <View style={[styles.successCard, { backgroundColor: colors.cardBg, borderColor: colors.gold }]}>
+            <View style={[styles.successRing, { borderColor: colors.gold }]}>
+              <Text style={[styles.successRingCheck, { color: colors.gold }]}>✓</Text>
+            </View>
+            <Text style={[styles.successTitle, { color: colors.text }]}>INQUIRY SUBMITTED</Text>
+            <Text style={[styles.successSub, { color: colors.textMuted }]}>YOUR REQUEST HAS BEEN RECEIVED</Text>
+
+            <View style={[styles.waitingMessage, { backgroundColor: colors.appBg, borderColor: colors.goldBorder }]}>
+              <Text style={[styles.waitingHighlight, { color: colors.gold }]}>Please wait for admin confirmation</Text>
+              <Text style={[styles.waitingDesc, { color: colors.boneMuted }]}>You will receive a notification once your inquiry is confirmed.</Text>
+            </View>
+
+            <Text style={[styles.successRef, { color: colors.gold, backgroundColor: colors.goldHover }]}>{refNum}</Text>
+
+            <View style={[styles.successDetails, { backgroundColor: colors.appBg }]}>
+              <View style={styles.successDetRow}>
+                <Text style={styles.successDetKey}>NAME</Text>
+                <Text style={[styles.successDetVal, { color: colors.text }]}>{`${formData.firstName} ${formData.lastName}`}</Text>
+              </View>
+              <View style={styles.successDetRow}>
+                <Text style={styles.successDetKey}>EMAIL</Text>
+                <Text style={[styles.successDetVal, { color: colors.text }]}>{formData.email}</Text>
+              </View>
+              <View style={styles.successDetRow}>
+                <Text style={styles.successDetKey}>CATEGORY</Text>
+                <Text style={[styles.successDetVal, { color: colors.text }]}>{formData.reason}</Text>
+              </View>
+              <View style={styles.successDetRow}>
+                <Text style={styles.successDetKey}>DATE</Text>
+                <Text style={[styles.successDetVal, { color: colors.text }]}>{formData.preferredDate}</Text>
+              </View>
+              <View style={styles.successDetRow}>
+                <Text style={styles.successDetKey}>TIME</Text>
+                <Text style={[styles.successDetVal, { color: colors.text }]}>{formData.preferredTime}</Text>
+              </View>
+              <View style={styles.successDetRow}>
+                <Text style={styles.successDetKey}>STATUS</Text>
+                <Text style={[styles.successDetVal, { color: '#facc15', fontWeight: 'bold' }]}>PENDING</Text>
+              </View>
+            </View>
+
+            {/* Inquiry Completion User Feedback Section */}
+            <View style={[styles.feedbackBox, { backgroundColor: colors.appBg, borderColor: colors.goldBorder }]}>
+              {feedbackSubmitted ? (
+                <View style={styles.feedbackSubmittedBox}>
+                  <Text style={styles.feedbackSubmittedStars}>{'★'.repeat(feedbackRating)}{'☆'.repeat(5 - feedbackRating)}</Text>
+                  <Text style={[styles.feedbackSubmittedTitle, { color: colors.gold }]}>Thank You for Your Feedback!</Text>
+                  <Text style={[styles.feedbackSubmittedDesc, { color: colors.boneMuted }]}>
+                    You rated our booking service {feedbackRating}/5 stars. Your review helps us improve cemetery online services for everyone.
+                  </Text>
+                </View>
+              ) : (
+                <View>
+                  <Text style={[styles.feedbackTitle, { color: colors.gold }]}>⭐ Rate Your Experience</Text>
+                  <Text style={[styles.feedbackSub, { color: colors.boneMuted }]}>How was your inquiry booking process?</Text>
+
+                  {/* Stars */}
+                  <View style={styles.feedbackStarsRow}>
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <TouchableOpacity
+                        key={star}
+                        style={styles.feedbackStarBtn}
+                        onPress={() => setFeedbackRating(star)}
+                      >
+                        <Text style={[styles.feedbackStarText, feedbackRating >= star && styles.feedbackStarActive]}>
+                          ⭐
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Quick Tags */}
+                  <View style={styles.feedbackTagsRow}>
+                    {quickFeedbackOptions.map(tag => {
+                      const isSelected = selectedTags.includes(tag);
+                      return (
+                        <TouchableOpacity
+                          key={tag}
+                          style={[
+                            styles.feedbackTag,
+                            { backgroundColor: colors.cardBg, borderColor: colors.divider },
+                            isSelected && [styles.feedbackTagSelected, { borderColor: colors.gold, backgroundColor: colors.goldHover || 'rgba(200, 168, 75, 0.15)' }]
+                          ]}
+                          onPress={() => toggleFeedbackTag(tag)}
+                        >
+                          <Text style={[
+                            styles.feedbackTagText,
+                            { color: colors.boneMuted },
+                            isSelected && [styles.feedbackTagTextSelected, { color: colors.gold }]
+                          ]}>
+                            {isSelected ? '✓ ' : ''}{tag}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {/* Comment Input */}
+                  <TextInput
+                    style={[styles.feedbackInput, { backgroundColor: colors.cardBg, borderColor: colors.inputBorder, color: colors.text }]}
+                    placeholder="Additional thoughts or suggestions? (optional)"
+                    placeholderTextColor={colors.boneDim}
+                    value={feedbackComment}
+                    onChangeText={setFeedbackComment}
+                    multiline={true}
+                    numberOfLines={2}
+                  />
+
+                  {/* Submit Feedback Button */}
+                  <TouchableOpacity
+                    style={[styles.feedbackSubmitBtn, { backgroundColor: colors.gold }]}
+                    onPress={handleFeedbackSubmit}
+                    disabled={isSubmittingFeedback}
+                  >
+                    <Text style={[styles.feedbackSubmitBtnText, { color: colors.stone }]}>
+                      {isSubmittingFeedback ? 'Submitting...' : 'Submit Feedback'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            <Text style={[styles.successInfo, { color: colors.boneMuted }]}>
+              A confirmation will be sent to your email and mobile number. The cemetery office will review your request within 1–2 business days.
+            </Text>
+
+            <TouchableOpacity
+              style={[styles.btnTrackInquiry, { backgroundColor: colors.gold }]}
+              onPress={() => {
+                setActiveTab('track');
+                setTrackAppId(refNum);
+                const contactVal = formData.email || formData.phone;
+                setTrackContactOrEmail(contactVal);
+                handleTrackInquiry(refNum, contactVal);
+              }}
+            >
+              <Text style={[styles.btnTrackInquiryText, { color: colors.stone }]}>
+                🔍 Track Status of This Inquiry
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.btnHome, { borderColor: colors.gold, marginTop: 10 }]} onPress={resetForm}>
+              <Text style={[styles.btnHomeText, { color: colors.gold }]}>Submit Another Inquiry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            {/* Progress Tracker */}
+            <View style={styles.progressWrap}>
+              <View style={styles.progressHeader}>
+                <Text style={[styles.progressLabel, { color: colors.text }]}>{stepLabels[step - 1]}</Text>
+                <Text style={[styles.progressCount, { color: colors.gold }]}>{step} / {totalSteps}</Text>
+              </View>
+              <View style={[styles.progressTrack, { backgroundColor: colors.divider }]}>
+                <View style={[styles.progressFill, { width: `${progressPercent}%`, backgroundColor: colors.gold }]} />
+              </View>
+            </View>
 
       {/* Step 1 */}
       {step === 1 && (
@@ -812,21 +1019,33 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
 
               {showTimeDropdown && (
                 <View style={[styles.dropdownContainer, { backgroundColor: colors.appBg, borderColor: colors.goldBorder }]}>
-                  {timeSlots.map((slot) => (
-                    <TouchableOpacity
-                      key={slot}
-                      style={[styles.dropdownItem, { borderBottomColor: colors.divider }]}
-                      onPress={() => {
-                        handleInputChange('preferredTime', slot);
-                        setShowTimeDropdown(false);
-                      }}
-                    >
-                      <Text style={[styles.dropdownItemText, { color: colors.text }]}>{slot}</Text>
-                    </TouchableOpacity>
-                  ))}
+                  {timeSlots.map((slot) => {
+                    const isBooked = formData.preferredDate ? getSlotStatus(formData.preferredDate, slot) === 'accepted' : false;
+                    return (
+                      <TouchableOpacity
+                        key={slot}
+                        style={[
+                          styles.dropdownItem,
+                          { borderBottomColor: colors.divider },
+                          isBooked && { opacity: 0.5 }
+                        ]}
+                        disabled={isBooked}
+                        onPress={() => {
+                          if (isBooked) return;
+                          handleInputChange('preferredTime', slot);
+                          setShowTimeDropdown(false);
+                        }}
+                      >
+                        <Text style={[styles.dropdownItemText, { color: isBooked ? '#ef4444' : colors.text }]}>
+                          {slot} {isBooked ? '(Booked)' : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               )}
               {errors.preferredTime && <Text style={styles.errMsg}>Please select a time slot.</Text>}
+              {errors.slotBooked && <Text style={styles.errMsg}>This schedule is already booked. Please select another available date and time.</Text>}
             </View>
 
             <View style={styles.formGroup}>
@@ -932,6 +1151,188 @@ export default function Inquiries({ baseUrl, theme = 'dark' }: ScreenProps) {
               )}
             </TouchableOpacity>
           </View>
+        </View>
+      )}
+          </>
+        )
+      )}
+
+      {/* Tab 2: Track Status */}
+      {activeTab === 'track' && (
+        <View style={styles.formPanel}>
+          <View style={styles.sectionBadge}>
+            <Text style={[styles.sectionBadgeNum, { backgroundColor: colors.gold, color: colors.stone }]}>🔍</Text>
+            <Text style={[styles.sectionBadgeText, { color: colors.gold }]}>APPLICATION TRACKER</Text>
+          </View>
+          <Text style={[styles.sectionHeading, { color: colors.text }]}>Check Inquiry Status</Text>
+          <Text style={[styles.sectionSubheading, { color: colors.boneMuted }]}>
+            Enter your Application Reference ID and the email or contact number used during submission to check real-time progress.
+          </Text>
+
+          <View style={[styles.formCard, { backgroundColor: colors.cardBg, borderColor: colors.goldBorder }]}>
+            <View style={styles.formGroup}>
+              <Text style={[styles.formLabel, { color: colors.textMuted }]}>
+                Application Reference ID <Text style={[styles.req, { color: colors.gold }]}>*</Text>
+              </Text>
+              <TextInput
+                style={[styles.formInput, { backgroundColor: colors.appBg, borderColor: colors.inputBorder, color: colors.text }]}
+                placeholder="e.g. APP-123456"
+                placeholderTextColor={colors.boneDim}
+                value={trackAppId}
+                onChangeText={(val) => {
+                  setTrackAppId(val);
+                  setTrackError(null);
+                }}
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={[styles.formLabel, { color: colors.textMuted }]}>
+                Registered Email or Contact Number <Text style={[styles.req, { color: colors.gold }]}>*</Text>
+              </Text>
+              <TextInput
+                style={[styles.formInput, { backgroundColor: colors.appBg, borderColor: colors.inputBorder, color: colors.text }]}
+                placeholder="e.g. juandelacruz@gmail.com or 09171234567"
+                placeholderTextColor={colors.boneDim}
+                value={trackContactOrEmail}
+                onChangeText={(val) => {
+                  setTrackContactOrEmail(val);
+                  setTrackError(null);
+                }}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoCorrect={false}
+              />
+            </View>
+
+            {trackError ? (
+              <View style={[styles.otpBanner, styles.otpBannerError, { marginBottom: 12 }]}>
+                <Text style={[styles.otpBannerText, { color: '#f87171' }]}>
+                  ⚠️ {trackError}
+                </Text>
+              </View>
+            ) : null}
+
+            <TouchableOpacity
+              style={[styles.btnNext, { backgroundColor: colors.gold }]}
+              onPress={() => handleTrackInquiry()}
+              disabled={isTracking}
+            >
+              {isTracking ? (
+                <ActivityIndicator color={colors.stone} size="small" />
+              ) : (
+                <Text style={[styles.btnNextText, { color: colors.stone }]}>
+                  🔍 Check Inquiry Status
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Track Result Card */}
+          {trackResult && (
+            <View style={[styles.trackResultCard, { backgroundColor: colors.cardBg, borderColor: colors.goldBorder }]}>
+              {/* Header with App ID and Status */}
+              <View style={styles.trackHeaderRow}>
+                <View>
+                  <Text style={[styles.trackRefLabel, { color: colors.boneDim }]}>REFERENCE NUMBER</Text>
+                  <Text style={[styles.trackRefId, { color: colors.gold }]}>{trackResult.APP_ID}</Text>
+                </View>
+                <View style={[
+                  styles.trackStatusBadge,
+                  {
+                    backgroundColor: getStatusInfo(trackResult.STATUS).bg,
+                    borderColor: getStatusInfo(trackResult.STATUS).border,
+                  }
+                ]}>
+                  <Text style={[
+                    styles.trackStatusBadgeText,
+                    { color: getStatusInfo(trackResult.STATUS).color }
+                  ]}>
+                    {getStatusInfo(trackResult.STATUS).icon} {getStatusInfo(trackResult.STATUS).label}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Status Notice */}
+              <View style={[
+                styles.trackNoticeBox,
+                {
+                  backgroundColor: getStatusInfo(trackResult.STATUS).bg,
+                  borderColor: getStatusInfo(trackResult.STATUS).border,
+                }
+              ]}>
+                <Text style={[
+                  styles.trackNoticeText,
+                  { color: getStatusInfo(trackResult.STATUS).color }
+                ]}>
+                  {getStatusInfo(trackResult.STATUS).message}
+                </Text>
+              </View>
+
+              {/* Details Grid */}
+              <View style={[styles.trackDetailsContainer, { backgroundColor: colors.appBg }]}>
+                <View style={styles.successDetRow}>
+                  <Text style={styles.successDetKey}>APPLICANT</Text>
+                  <Text style={[styles.successDetVal, { color: colors.text }]}>{trackResult.FAMILY_NAME || 'N/A'}</Text>
+                </View>
+                <View style={styles.successDetRow}>
+                  <Text style={styles.successDetKey}>DECEASED</Text>
+                  <Text style={[styles.successDetVal, { color: colors.text }]}>{trackResult.DECEASED || 'N/A'}</Text>
+                </View>
+                <View style={styles.successDetRow}>
+                  <Text style={styles.successDetKey}>SERVICE</Text>
+                  <Text style={[styles.successDetVal, { color: colors.text }]}>{trackResult.reason || 'General Inquiry'}</Text>
+                </View>
+                <View style={styles.successDetRow}>
+                  <Text style={styles.successDetKey}>PLOT REQUESTED</Text>
+                  <Text style={[styles.successDetVal, { color: colors.text }]}>{trackResult.REQUESTED_PLOT || 'Not specified'}</Text>
+                </View>
+                <View style={styles.successDetRow}>
+                  <Text style={styles.successDetKey}>SCHEDULE DATE</Text>
+                  <Text style={[styles.successDetVal, { color: colors.text }]}>{trackResult.BURIAL_DATE || 'Pending schedule'}</Text>
+                </View>
+                <View style={styles.successDetRow}>
+                  <Text style={styles.successDetKey}>TIME SLOT</Text>
+                  <Text style={[styles.successDetVal, { color: colors.text }]}>{trackResult.TIME || 'Pending schedule'}</Text>
+                </View>
+                <View style={styles.successDetRow}>
+                  <Text style={styles.successDetKey}>SUBMITTED ON</Text>
+                  <Text style={[styles.successDetVal, { color: colors.text }]}>{formatDateTime(trackResult.createdAt)}</Text>
+                </View>
+              </View>
+
+              {/* Official Remarks / Instructions */}
+              {trackResult.remarks ? (
+                <View style={[styles.trackRemarksBox, { backgroundColor: colors.appBg, borderColor: colors.goldBorder }]}>
+                  <Text style={[styles.trackRemarksTitle, { color: colors.gold }]}>OFFICIAL REMARKS</Text>
+                  <Text style={[styles.trackRemarksText, { color: colors.text }]}>{trackResult.remarks}</Text>
+                </View>
+              ) : null}
+
+              {/* Action Buttons */}
+              <View style={styles.trackActionRow}>
+                <TouchableOpacity
+                  style={[styles.btnTrackRefresh, { borderColor: colors.gold }]}
+                  onPress={() => handleTrackInquiry()}
+                  disabled={isTracking}
+                >
+                  <Text style={[styles.btnTrackRefreshText, { color: colors.gold }]}>↻ Refresh Status</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.btnTrackNew, { backgroundColor: colors.gold }]}
+                  onPress={() => {
+                    resetForm();
+                    setActiveTab('submit');
+                  }}
+                >
+                  <Text style={[styles.btnTrackNewText, { color: colors.stone }]}>+ New Inquiry</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </View>
       )}
     </ScrollView>
@@ -1555,5 +1956,133 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
     textTransform: 'uppercase',
+  },
+  topTabContainer: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderRadius: 8,
+    marginBottom: 20,
+    overflow: 'hidden',
+    padding: 3,
+  },
+  topTabBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 6,
+  },
+  topTabBtnActive: {
+    // Handled dynamically with colors.gold
+  },
+  topTabBtnText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    letterSpacing: 0.8,
+  },
+  btnTrackInquiry: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  btnTrackInquiryText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  trackResultCard: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 24,
+  },
+  trackHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  trackRefLabel: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+  },
+  trackRefId: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+    marginTop: 2,
+  },
+  trackStatusBadge: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  trackStatusBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+  },
+  trackNoticeBox: {
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 12,
+    marginBottom: 16,
+  },
+  trackNoticeText: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  trackDetailsContainer: {
+    borderRadius: 6,
+    padding: 14,
+    gap: 8,
+    marginBottom: 16,
+  },
+  trackRemarksBox: {
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 12,
+    marginBottom: 16,
+  },
+  trackRemarksTitle: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  trackRemarksText: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  trackActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  btnTrackRefresh: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnTrackRefreshText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  btnTrackNew: {
+    flex: 1,
+    borderRadius: 6,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnTrackNewText: {
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });

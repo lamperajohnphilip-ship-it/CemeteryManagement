@@ -4,7 +4,6 @@
   background: var(--admin-bg);
   color: var(--admin-text-main);
   font-family: 'Jost', sans-serif;
-  margin-top: -60px; /* Offset root padding */
   z-index: 100;
   position: relative;
   transition: background 0.3s, color 0.3s;
@@ -31,12 +30,15 @@
 }
 
 .sbLogo {
-  padding: 22px 20px;
+  height: 62px;
+  box-sizing: border-box;
+  padding: 0 16px;
   border-bottom: 1px solid var(--admin-sidebar-border);
   display: flex;
   align-items: center;
   gap: 11px;
   position: relative;
+  flex-shrink: 0;
 }
 
 .sidebarToggle {

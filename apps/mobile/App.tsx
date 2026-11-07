@@ -1,8 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { 
   StyleSheet, 
   Platform, 
-  StatusBar as RNStatusBar, 
+  StatusBar, 
   View, 
   Text, 
   TouchableOpacity, 
@@ -10,7 +10,6 @@ import {
   TouchableWithoutFeedback,
   Dimensions
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
@@ -21,131 +20,38 @@ import GraveMapping from './src/screens/GraveMapping';
 import Announcements from './src/screens/Announcements';
 import AboutUs from './src/screens/AboutUs';
 
-import Constants from 'expo-constants';
+import { themeColors, Theme } from './src/theme/colors';
+import { getBaseUrl } from './src/config/api';
+import { getPublicSettings } from './src/services/api';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 
-// Base URL configuration — dynamically resolved from Expo dev server host.
-// This avoids hardcoding IP addresses that change between networks.
-// In production, replace this with your deployed server URL.
-function getBaseUrl(): string {
-  // In Expo Go / dev client, Constants.expoConfig.hostUri is the dev machine's IP + port
-  const host = Constants.expoConfig?.hostUri;
-  if (host) {
-    // hostUri is "192.168.x.x:8081" — we replace the Expo port with the web server port
-    const ip = host.split(':')[0];
-    return `http://${ip}:3000`;
-  }
-  // Fallback for production or if hostUri is unavailable
-  return 'https://cemetery-management-web.vercel.app';
-}
+// Re-export for any external consumers
+export { themeColors, Theme } from './src/theme/colors';
 
 const BASE_URL = getBaseUrl();
 
-
 type ScreenType = 'dashboard' | 'inquiries' | 'mapping' | 'announcements' | 'about';
-export type Theme = 'dark' | 'light';
-
-// ─────────────────────────────────────────────────────────────────
-// Centralized theme colors matching globals.css / admin portal
-// ─────────────────────────────────────────────────────────────────
-export const themeColors = {
-  dark: {
-    // App shell
-    appBg:           '#1a1814',
-    headerBg:        'rgba(26,24,20,0.95)',
-    headerBorder:    'rgba(201,168,76,0.15)',
-    // Drawer
-    drawerBg:        '#2c2925',
-    drawerBorder:    'rgba(201,168,76,0.18)',
-    drawerHeaderBg:  'rgba(26,24,20,0.6)',
-    drawerHeaderBorder: 'rgba(201,168,76,0.12)',
-    overlayBg:       '#0a0908',
-    // Nav item
-    drawerItemBg:    'transparent',
-    drawerItemActiveBg: 'rgba(201,168,76,0.06)',
-    drawerItemBorderActive: '#c9a84c',
-    drawerTextColor: 'rgba(232,224,208,0.65)',
-    drawerTextActive: '#c9a84c',
-    // Theme toggle pill
-    toggleRowBg:     'rgba(26,24,20,0.4)',
-    toggleRowBorder: 'rgba(201,168,76,0.15)',
-    toggleBtnColor:  'rgba(232,224,208,0.4)',
-    toggleActiveBg:  '#c9a84c',
-    toggleActiveColor: '#1a1814',
-    // Generic palette
-    gold:            '#c9a84c',
-    goldBorder:      'rgba(201,168,76,0.3)',
-    goldHover:       'rgba(201,168,76,0.06)',
-    stone:           '#1a1814',
-    ash:             '#2c2925',
-    fog:             '#3d3830',
-    bone:            '#f5f0e8',
-    boneMuted:       'rgba(232,224,208,0.65)',
-    boneDim:         'rgba(232,224,208,0.3)',
-    text:            '#f5f0e8',
-    textMuted:       'rgba(232,224,208,0.5)',
-    textDim:         '#7A7570',
-    inputBg:         '#2c2925',
-    inputBorder:     'rgba(201,168,76,0.3)',
-    cardBg:          '#2c2925',
-    sectionBg:       '#3d3830',
-    modalBg:         '#2c2925',
-    modalOverlay:    'rgba(10,9,8,0.85)',
-    divider:         'rgba(232,224,208,0.05)',
-    statusBar:       'light' as 'light' | 'dark',
-  },
-  light: {
-    // App shell
-    appBg:           '#f8f9fa',
-    headerBg:        'rgba(255,255,255,0.97)',
-    headerBorder:    '#e2e8f0',
-    // Drawer
-    drawerBg:        '#ffffff',
-    drawerBorder:    '#e2e8f0',
-    drawerHeaderBg:  '#f1f5f9',
-    drawerHeaderBorder: '#e2e8f0',
-    overlayBg:       'rgba(15,23,42,0.3)',
-    // Nav item
-    drawerItemBg:    'transparent',
-    drawerItemActiveBg: '#f5f0e8',
-    drawerItemBorderActive: '#a16207',
-    drawerTextColor: '#475569',
-    drawerTextActive: '#854d0e',
-    // Theme toggle pill
-    toggleRowBg:     '#f1f5f9',
-    toggleRowBorder: '#cbd5e1',
-    toggleBtnColor:  '#64748b',
-    toggleActiveBg:  '#a16207',
-    toggleActiveColor: '#ffffff',
-    // Generic palette
-    gold:            '#a16207',
-    goldBorder:      'rgba(161,98,7,0.25)',
-    goldHover:       'rgba(161,98,7,0.08)',
-    stone:           '#f8f9fa',
-    ash:             '#ffffff',
-    fog:             '#f1f5f9',
-    bone:            '#111111',
-    boneMuted:       '#475569',
-    boneDim:         '#64748b',
-    text:            '#111111',
-    textMuted:       '#475569',
-    textDim:         '#64748b',
-    inputBg:         '#f8fafc',
-    inputBorder:     '#cbd5e1',
-    cardBg:          '#ffffff',
-    sectionBg:       '#f1f5f9',
-    modalBg:         '#ffffff',
-    modalOverlay:    'rgba(15,23,42,0.5)',
-    divider:         '#e2e8f0',
-    statusBar:       'dark' as 'light' | 'dark',
-  },
-};
 
 export default function App() {
   const [activeScreen, setActiveScreen] = useState<ScreenType>('dashboard');
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [locateGraveData, setLocateGraveData] = useState<any>(null);
   const [theme, setTheme] = useState<Theme>('dark');
+  const [maintenance, setMaintenance] = useState<{ mode: boolean; message: string } | null>(null);
   const drawerAnimation = useRef(new Animated.Value(0)).current; // 0 = closed, 1 = open
+
+  useEffect(() => {
+    getPublicSettings(BASE_URL)
+      .then((data) => {
+        if (data && data.maintenanceMode) {
+          setMaintenance({
+            mode: true,
+            message: data.maintenanceMessage || 'System maintenance in progress.',
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const colors = themeColors[theme];
 
@@ -154,7 +60,7 @@ export default function App() {
     Animated.timing(drawerAnimation, {
       toValue: 1,
       duration: 300,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   };
 
@@ -162,7 +68,7 @@ export default function App() {
     Animated.timing(drawerAnimation, {
       toValue: 0,
       duration: 250,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start(() => {
       setDrawerVisible(false);
     });
@@ -226,10 +132,22 @@ export default function App() {
   };
 
   return (
-    <SafeAreaProvider>
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
-        <StatusBar style={colors.statusBar} backgroundColor={colors.headerBg} />
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
+        <StatusBar barStyle={colors.statusBar === 'light' ? 'light-content' : 'dark-content'} />
         
+        {/* System Maintenance Banner (Synchronized with public settings) */}
+        {maintenance?.mode && (
+          <View style={styles.maintenanceBanner}>
+            <Text style={styles.maintenanceIcon}>⚠️</Text>
+            <Text style={styles.maintenanceText}>
+              <Text style={{ fontWeight: 'bold' }}>Scheduled System Maintenance: </Text>
+              {maintenance.message}
+            </Text>
+          </View>
+        )}
+
         {/* Native App Header */}
         <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.headerBorder }]}>
           <TouchableOpacity style={styles.menuBtn} onPress={openDrawer} activeOpacity={0.7}>
@@ -370,6 +288,7 @@ export default function App() {
         </Animated.View>
       </SafeAreaView>
     </SafeAreaProvider>
+  </ErrorBoundary>
   );
 }
 
@@ -418,7 +337,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     zIndex: 149,
   },
   drawer: {
@@ -528,5 +451,25 @@ const styles = StyleSheet.create({
       ios: { fontFamily: 'DM Mono' },
       android: { fontFamily: 'monospace' },
     }),
+  },
+  maintenanceBanner: {
+    backgroundColor: '#7f1d1d',
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  maintenanceIcon: {
+    fontSize: 13,
+  },
+  maintenanceText: {
+    color: '#fef2f2',
+    fontSize: 11,
+    textAlign: 'center',
+    flexShrink: 1,
   },
 });

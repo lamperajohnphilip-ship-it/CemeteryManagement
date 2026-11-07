@@ -13,10 +13,12 @@ import {
   Dimensions,
   RefreshControl,
 } from 'react-native';
-import { themeColors, Theme } from '../../App';
+import { themeColors, Theme } from '../theme/colors';
+import { getDeceasedRecords, DeceasedRecord } from '../services/api';
+import { getBaseUrl, PRODUCTION_API_URL, setApiUrlOverride } from '../config/api';
 
 interface ScreenProps {
-  baseUrl: string;
+  baseUrl?: string;
   onLocateGrave?: (graveData: any) => void;
   theme?: Theme;
 }
@@ -68,49 +70,38 @@ export default function Dashboard({ baseUrl, onLocateGrave, theme = 'dark' }: Sc
   const colors = themeColors[theme];
   const styles = getStyles(colors);
   const [searchTerm, setSearchTerm] = useState('');
-  const [deceasedRecords, setDeceasedRecords] = useState<any[]>([]);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [deceasedRecords, setDeceasedRecords] = useState<DeceasedRecord[]>([]);
+  const [searchResults, setSearchResults] = useState<DeceasedRecord[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<any | null>(null);
-
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [currentBaseUrl, setCurrentBaseUrl] = useState<string>(baseUrl || getBaseUrl());
 
   // Animation values
   const searchAnim = useRef(new Animated.Value(0)).current;
 
-  const loadRecords = async (showIndicator = true) => {
+  const loadRecords = async (showIndicator = true, overrideUrl?: string) => {
+    const targetUrl = overrideUrl || currentBaseUrl || baseUrl || getBaseUrl();
     try {
       if (showIndicator) setLoading(true);
-      const response = await fetch(`${baseUrl}/api/deceased`);
-      const data = await response.json();
-      if (data.success && data.records) {
-        const dbRecords = data.records.map((r: any) => ({
-          id: r.id,
-          ref: r.REF_NO,
-          payor: r.PAYORS_NAME,
-          contact: r.CONTACT_NO,
-          deceased: r.NAME_OF_DECEASED,
-          address: r.ADDRESS,
-          birthDate: r.DATE_OF_BIRTH ? (new Date(r.DATE_OF_BIRTH).toISOString().split('T')[0] || '') : '',
-          deathDate: r.DATE_OF_DEATH ? (new Date(r.DATE_OF_DEATH).toISOString().split('T')[0] || '') : '',
-          yearPaid: r.YEAR?.toString() || '',
-          totalAmount: r.TOTAL_DUE,
-          amountPaid: r.PAID,
-          balance: r.BALANCE,
-          paymentStatus: (r.STATUS || 'pending').toLowerCase(),
-          remarks: r.REMARKS || '',
-          gender: 'Male', // Default fallback
-          civilStatus: 'Single',
-          nationality: 'Filipino'
-        }));
-        setDeceasedRecords(dbRecords);
-      }
-    } catch (e) {
+      setErrorMessage(null);
+      const records = await getDeceasedRecords(targetUrl);
+      setDeceasedRecords(records);
+      setErrorMessage(null);
+    } catch (e: any) {
       console.error('Error fetching records in mobile app:', e);
+      setErrorMessage(e.message || 'Failed to connect to cemetery server.');
     } finally {
       if (showIndicator) setLoading(false);
     }
+  };
+
+  const handleSwitchToCloud = async () => {
+    setApiUrlOverride(PRODUCTION_API_URL);
+    setCurrentBaseUrl(PRODUCTION_API_URL);
+    await loadRecords(true, PRODUCTION_API_URL);
   };
 
   const onRefresh = async () => {
@@ -130,7 +121,7 @@ export default function Dashboard({ baseUrl, onLocateGrave, theme = 'dark' }: Sc
     return () => {
       clearInterval(interval);
     };
-  }, []);
+  }, [currentBaseUrl]);
 
   const performSearch = (term: string) => {
     setSearchTerm(term);
@@ -155,7 +146,7 @@ export default function Dashboard({ baseUrl, onLocateGrave, theme = 'dark' }: Sc
 
     Animated.spring(searchAnim, {
       toValue: 1,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   };
 
@@ -229,6 +220,53 @@ export default function Dashboard({ baseUrl, onLocateGrave, theme = 'dark' }: Sc
 
             {loading && (
               <ActivityIndicator color="#c9a84c" style={{ marginTop: 12 }} />
+            )}
+
+            {/* Error Banner with Retry and Cloud Fallback */}
+            {errorMessage && (
+              <View style={[styles.errorCard, { backgroundColor: colors.cardBg, borderColor: 'rgba(239, 68, 68, 0.5)' }]}>
+                <View style={styles.errorHeader}>
+                  <Text style={styles.errorIcon}>⚠️</Text>
+                  <Text style={[styles.errorTitle, { color: '#f87171' }]}>Server Connection Issue</Text>
+                </View>
+                <Text style={[styles.errorMessage, { color: colors.textMuted }]}>{errorMessage}</Text>
+                <View style={styles.errorActions}>
+                  <TouchableOpacity
+                    style={[styles.retryBtn, { backgroundColor: colors.gold }]}
+                    onPress={() => loadRecords(true)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.retryBtnText, { color: colors.stone }]}>Retry Connection</Text>
+                  </TouchableOpacity>
+                  {currentBaseUrl !== PRODUCTION_API_URL && (
+                    <TouchableOpacity
+                      style={[styles.cloudBtn, { borderColor: colors.goldBorder }]}
+                      onPress={handleSwitchToCloud}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.cloudBtnText, { color: colors.gold }]}>Connect to Cloud Server</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            )}
+
+            {/* Empty State when 0 records exist */}
+            {!loading && !errorMessage && deceasedRecords.length === 0 && !showResults && (
+              <View style={[styles.emptyCard, { backgroundColor: colors.cardBg, borderColor: colors.goldBorder }]}>
+                <Text style={styles.emptyIcon}>📂</Text>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>No Records Available</Text>
+                <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
+                  The deceased records registry is currently empty or updating.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.refreshBtn, { backgroundColor: colors.gold }]}
+                  onPress={() => loadRecords(true)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.refreshBtnText, { color: colors.stone }]}>Refresh Registry</Text>
+                </TouchableOpacity>
+              </View>
             )}
 
             {/* Autocomplete Search Results Overlay */}
@@ -677,5 +715,93 @@ const getStyles = (colors: any) => StyleSheet.create({
     textAlignVertical: 'top',
     height: 70,
     marginBottom: 10,
+  },
+  errorCard: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 14,
+    width: '100%',
+  },
+  errorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  errorIcon: {
+    fontSize: 16,
+  },
+  errorTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  errorMessage: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  errorActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  retryBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  cloudBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cloudBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  emptyCard: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 24,
+    marginTop: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  emptyIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+    letterSpacing: 0.5,
+  },
+  emptySubtitle: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  refreshBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 6,
+  },
+  refreshBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

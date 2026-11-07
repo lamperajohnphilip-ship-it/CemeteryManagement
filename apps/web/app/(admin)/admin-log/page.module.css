@@ -6,8 +6,6 @@
   background: #080808;
   color: #F0EDE6;
   font-family: 'Jost', sans-serif;
-  margin-top: -60px;
-  /* Offset the 60px padding from the root layout if navigation persists */
   z-index: 10;
 }
 

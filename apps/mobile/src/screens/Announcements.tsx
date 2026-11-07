@@ -9,10 +9,12 @@ import {
   Platform,
   RefreshControl,
 } from 'react-native';
-import { themeColors, Theme } from '../../App';
+import { themeColors, Theme } from '../theme/colors';
+import { getAnnouncements } from '../services/api';
+import { getBaseUrl } from '../config/api';
 
 interface ScreenProps {
-  baseUrl: string;
+  baseUrl?: string;
   theme?: Theme;
 }
 
@@ -25,6 +27,8 @@ interface Announcement {
   content: string;
   status: string;
   visibility: string;
+  validFrom?: string | null;
+  validUntil?: string | null;
 }
 
 export default function Announcements({ baseUrl, theme = 'dark' }: ScreenProps) {
@@ -34,6 +38,7 @@ export default function Announcements({ baseUrl, theme = 'dark' }: ScreenProps) 
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [toastMsg, setToastMsg] = useState('');
   const [showToast, setShowToast] = useState(false);
@@ -49,13 +54,12 @@ export default function Announcements({ baseUrl, theme = 'dark' }: ScreenProps) 
   const loadAnnouncements = async (incrementViews = false, showIndicator = true) => {
     try {
       if (showIndicator) setLoading(true);
-      const response = await fetch(`${baseUrl}/api/announcements?incrementViews=${incrementViews}`);
-      const data = await response.json();
-      if (data.success && data.announcements) {
-        setAnnouncements(data.announcements);
-      }
-    } catch (e) {
+      setErrorMessage(null);
+      const list = await getAnnouncements(incrementViews, baseUrl || getBaseUrl());
+      setAnnouncements(list);
+    } catch (e: any) {
       console.error('Error fetching announcements on mobile:', e);
+      setErrorMessage(e.message || 'Unable to load announcements.');
     } finally {
       if (showIndicator) setLoading(false);
     }
@@ -107,10 +111,32 @@ export default function Announcements({ baseUrl, theme = 'dark' }: ScreenProps) 
     }
   };
 
+  const formatSchedule = (from?: string | null, until?: string | null) => {
+    if (!from && !until) return null;
+    try {
+      const opt: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
+      if (from && until) {
+        return `${new Date(from).toLocaleDateString('en-US', opt)} – ${new Date(until).toLocaleDateString('en-US', opt)}`;
+      }
+      if (from) return `Starting ${new Date(from).toLocaleDateString('en-US', opt)}`;
+      if (until) return `Until ${new Date(until).toLocaleDateString('en-US', opt)}`;
+    } catch (_) {}
+    return null;
+  };
+
   const filteredAnnouncements = announcements.filter(a => {
-    const isPublic = a.status === 'active' && a.visibility === 'Public (Visible to all)';
+    const statusClean = (a.status || 'active').toLowerCase();
+    const visClean = (a.visibility || 'public').toLowerCase();
+    const isPublic = statusClean === 'active' && (visClean.includes('public') || !a.visibility);
     if (!isPublic) return false;
-    return currentFilter === 'all' || a.category.toLowerCase() === currentFilter;
+    if (currentFilter === 'all') return true;
+
+    const cat = (a.category || '').toLowerCase().trim();
+    if (currentFilter === 'notices') return cat.startsWith('notice');
+    if (currentFilter === 'events') return cat.startsWith('event');
+    if (currentFilter === 'alerts') return cat.startsWith('alert') || cat.startsWith('emerg');
+    if (currentFilter === 'info') return cat.startsWith('info') || cat.startsWith('gen');
+    return cat === currentFilter;
   });
 
   return (
@@ -154,7 +180,20 @@ export default function Announcements({ baseUrl, theme = 'dark' }: ScreenProps) 
             />
           }
         >
-          {filteredAnnouncements.length === 0 ? (
+          {errorMessage ? (
+            <View style={[styles.emptyState, { borderColor: 'rgba(239, 68, 68, 0.4)', borderWidth: 1, borderRadius: 8, padding: 20 }]}>
+              <Text style={styles.emptyIcon}>⚠️</Text>
+              <Text style={[styles.emptyTitle, { color: '#f87171' }]}>Unable to Load Announcements</Text>
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}>{errorMessage}</Text>
+              <TouchableOpacity
+                style={{ backgroundColor: colors.gold, paddingVertical: 8, paddingHorizontal: 20, borderRadius: 6, marginTop: 14 }}
+                onPress={() => loadAnnouncements(false, true)}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: colors.stone, fontWeight: '700', fontSize: 12 }}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : filteredAnnouncements.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>⏳</Text>
               <Text style={[styles.emptyTitle, { color: colors.gold }]}>No Announcements Yet</Text>
@@ -171,6 +210,11 @@ export default function Announcements({ baseUrl, theme = 'dark' }: ScreenProps) 
                     </View>
                     <Text style={[styles.cardDate, { color: colors.textMuted }]}>📅 {formatDate(ann.date)}</Text>
                   </View>
+                  {formatSchedule(ann.validFrom, ann.validUntil) ? (
+                    <Text style={[styles.cardDate, { color: colors.gold, marginTop: 4, fontWeight: '600' }]}>
+                      🗓️ {formatSchedule(ann.validFrom, ann.validUntil)}
+                    </Text>
+                  ) : null}
                 </View>
 
                 {/* Announcement Content */}

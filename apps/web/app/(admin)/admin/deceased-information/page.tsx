@@ -104,6 +104,10 @@ export default function DeceasedInventoryPage() {
 
   useEffect(() => {
     loadInventory();
+    if (typeof window !== 'undefined') {
+      const q = new URLSearchParams(window.location.search).get('search');
+      if (q) setFilterName(q);
+    }
     const handleStorage = (e: StorageEvent) => {
       if (e.key === INVENTORY_KEY || e.key === PAYMENTS_KEY) loadInventory();
     };

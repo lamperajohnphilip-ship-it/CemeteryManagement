@@ -129,6 +129,21 @@ export async function submitInquiry(data: {
       console.warn('Initial receipt email dispatch warning:', emailErr);
     }
 
+    // 4. Dispatch SMS acknowledgment to the citizen if contact is provided
+    if (data.CONTACT && data.CONTACT.trim()) {
+      try {
+        await sendSmsNotification({
+          recipient: data.CONTACT.trim(),
+          recipientName: data.FAMILY_NAME.trim(),
+          message: `Hi ${data.FAMILY_NAME.trim()}, your cemetery inquiry (Ref: ${data.APP_ID}) has been received by Jasaan Municipal Cemetery. We will review your request shortly.`,
+          type: 'INQUIRY_RECEIVED',
+          sentBy: 'SYSTEM',
+        });
+      } catch (smsErr) {
+        console.warn('Initial receipt SMS dispatch warning:', smsErr);
+      }
+    }
+
     safeRevalidate('/admin/inquiries');
     return { success: true, record };
   } catch (error: any) {

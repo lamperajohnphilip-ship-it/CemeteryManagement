@@ -5,6 +5,7 @@ import {
   deleteAnnouncement, 
   toggleAnnouncementStatus
 } from '../../actions/announcements';
+import { verifyAdminSession } from '../../../lib/auth';
 
 export async function GET(request: Request) {
   try {
@@ -20,6 +21,15 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    // Enforce role-based server-side authorization: only admins can create, delete, or toggle announcements
+    const auth = await verifyAdminSession();
+    if (!auth.success || !auth.session) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Administrator session required.' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { action } = body;
 

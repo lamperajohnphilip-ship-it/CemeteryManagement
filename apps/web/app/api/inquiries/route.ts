@@ -6,8 +6,8 @@ import { prisma } from '../../../lib/prisma';
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const appId = searchParams.get('appId');
-    const contactOrEmail = searchParams.get('email') || searchParams.get('contact');
+    const appId = searchParams.get('appId')?.trim();
+    const contactOrEmail = (searchParams.get('email') || searchParams.get('contact'))?.trim();
 
     // Case 1: Admin-authenticated request — return all inquiries
     const auth = await verifyAdminSession();
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     if (appId && contactOrEmail) {
       const inquiry = await prisma.inquiries.findFirst({
         where: {
-          APP_ID: appId,
+          APP_ID: { equals: appId, mode: 'insensitive' },
           OR: [
             { email: { equals: contactOrEmail.toLowerCase(), mode: 'insensitive' } },
             { CONTACT: contactOrEmail },
@@ -34,6 +34,7 @@ export async function GET(request: Request) {
           BURIAL_DATE: true,
           TIME: true,
           REQUESTED_PLOT: true,
+          reason: true,
           remarks: true,
           createdAt: true,
         },
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
 
       if (!inquiry) {
         return NextResponse.json(
-          { success: false, message: 'No matching inquiry found. Please check your Application ID and email/contact.' },
+          { success: false, message: 'No matching inquiry found. Please verify your Application ID and email/contact number.' },
           { status: 404 }
         );
       }
@@ -77,6 +78,15 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    // Enforce role-based server-side authorization: only admins can mutate inquiry status
+    const auth = await verifyAdminSession();
+    if (!auth.success || !auth.session) {
+      return NextResponse.json(
+        { success: false, message: 'Unauthorized: Administrator session required.' },
+        { status: 401 }
+      );
+    }
+
     const data = await request.json();
     const { id, status, remarks } = data;
     if (!id || !status) {

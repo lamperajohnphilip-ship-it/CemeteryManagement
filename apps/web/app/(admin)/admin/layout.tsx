@@ -14,6 +14,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
 
   const [adminProfile, setAdminProfile] = useState<{ name?: string; role?: string; avatar?: string } | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const toggleSidebar = () => setCollapsed(!collapsed);
   const toggleMobile = () => setMobileOpen(!mobileOpen);
@@ -117,6 +118,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
+  const currentMenuItem = menuItems.find((item) => item.path === pathname);
+  const sectionTitle = currentMenuItem ? currentMenuItem.name : 'ADMIN PORTAL';
+
+  const handleSearchSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && searchTerm.trim()) {
+      router.push(`/admin/deceased-information?search=${encodeURIComponent(searchTerm.trim())}`);
+    }
+  };
+
   return (
     <div className={styles.adminLayout}>
       <div className={`${styles.sidebar} ${collapsed ? styles.sidebarCollapsed : ''} ${mobileOpen ? styles.mobileOpen : ''}`}>
@@ -177,12 +187,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className={styles.mobileMenuBtn} onClick={toggleMobile}>☰</div>
           <div className={styles.topbarTitle}>
             <h2>Jasaan Public Cemetery</h2>
+            <p>Admin Portal · {sectionTitle}</p>
           </div>
           <div className={styles.topbarSearch}>
             <span className={styles.searchIcon}>⌕</span>
-            <input type="text" placeholder="Search grave, records..." />
+            <input
+              type="text"
+              placeholder="Search grave, records..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={handleSearchSubmit}
+            />
           </div>
-          <div className={styles.tbBtn}>🔔<span className={styles.notifPip}></span></div>
+          <Link href="/admin/inquiries" className={styles.tbBtn} title="View notifications & inquiries">
+            🔔<span className={styles.notifPip}></span>
+          </Link>
         </div>
 
         <div className={styles.contentWrapper}>

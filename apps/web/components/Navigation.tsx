@@ -56,7 +56,8 @@ export default function Navigation() {
       .catch(() => {});
   }, []);
 
-  const navItems = [
+  // Mobile sidebar nav items (Preserved with original icons)
+  const mobileNavItems = [
     {
       name: 'DASHBOARD', path: '/dashboard', icon: (
         <svg className={styles.navItemIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -108,6 +109,15 @@ export default function Navigation() {
     }
   ];
 
+  // Desktop & Tablet horizontal nav items
+  const desktopNavItems = [
+    { name: 'DASHBOARD', path: '/dashboard' },
+    { name: 'INQUIRIES', path: '/inquiries' },
+    { name: 'GRAVE MAPPING', path: '/grave-mapping' },
+    { name: 'ANNOUNCEMENTS', path: '/announcements' },
+    { name: 'ABOUT US', path: '/about-us' },
+  ];
+
   if (pathname.startsWith('/admin') || isMobileApp) {
     return null;
   }
@@ -138,25 +148,97 @@ export default function Navigation() {
           </span>
         </div>
       )}
-      <nav className={styles.nav}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
-          <button
-            className={`${styles.menuBtn} ${isOpen ? styles.menuBtnOpen : ''}`}
-            onClick={toggleSidebar}
-            aria-label="Toggle menu"
-          >
-            <span></span><span></span><span></span>
-          </button>
-          <div className={styles.navLogo}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z" />
-              <circle cx="12" cy="9" r="2.5" />
-            </svg>
-            ETERNAL REST
-          </div>
-        </div>
-      </nav>
 
+      {/* Main Top Header Navigation */}
+      <header className={styles.header}>
+        <nav className={styles.nav}>
+          {/* Left: Mobile Menu Toggle Button (Mobile Only) + Brand Logo */}
+          <div className={styles.navLeft}>
+            <button
+              className={`${styles.menuBtn} ${isOpen ? styles.menuBtnOpen : ''}`}
+              onClick={toggleSidebar}
+              aria-label="Toggle menu"
+            >
+              <span></span><span></span><span></span>
+            </button>
+            <Link href="/dashboard" className={styles.navLogo} aria-label="Eternal Rest Home">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z" />
+                <circle cx="12" cy="9" r="2.5" />
+              </svg>
+              <span>ETERNAL REST</span>
+            </Link>
+          </div>
+
+          {/* Center: Desktop & Tablet Horizontal Navigation Links */}
+          <div className={styles.desktopNavLinks}>
+            {desktopNavItems.map((item) => {
+              const isActive =
+                pathname === item.path ||
+                (item.path !== '/dashboard' && pathname.startsWith(item.path));
+              return (
+                <Link
+                  key={item.name}
+                  href={item.path}
+                  className={`${styles.navLink} ${isActive ? styles.navLinkActive : ''}`}
+                >
+                  <span className={styles.navLinkText}>{item.name}</span>
+                  {isActive && <span className={styles.activeIndicator} />}
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Right: Desktop & Tablet User Controls */}
+          <div className={styles.desktopActions}>
+            <button
+              className={styles.desktopThemeBtn}
+              onClick={() => handleThemeChange(theme === 'dark' ? 'light' : 'dark')}
+              title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
+              aria-label="Toggle theme"
+              type="button"
+            >
+              {theme === 'dark' ? (
+                <>
+                  <svg className={styles.desktopThemeIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="5" />
+                    <line x1="12" y1="1" x2="12" y2="3" />
+                    <line x1="12" y1="21" x2="12" y2="23" />
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                    <line x1="1" y1="12" x2="3" y2="12" />
+                    <line x1="21" y1="12" x2="23" y2="12" />
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                  </svg>
+                  <span className={styles.themeBtnText}>LIGHT</span>
+                </>
+              ) : (
+                <>
+                  <svg className={styles.desktopThemeIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                  </svg>
+                  <span className={styles.themeBtnText}>DARK</span>
+                </>
+              )}
+            </button>
+            <Link
+              href="/admin-log"
+              className={styles.adminLogBtn}
+              title="Administrator Access"
+              aria-label="Administrator Access"
+            >
+              <svg className={styles.adminLogIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <span className={styles.adminBtnText}>ADMIN</span>
+            </Link>
+          </div>
+        </nav>
+      </header>
+
+      {/* Mobile-Only Sidebar Navigation & Overlay (Preserved Exactly) */}
       <div
         className={`${styles.sidebarOverlay} ${isOpen ? styles.sidebarOverlayShow : ''}`}
         onClick={closeSidebar}
@@ -174,7 +256,7 @@ export default function Navigation() {
           <div className={styles.sidebarTagline}>Municipality of Jasaan · Cemetery Portal</div>
         </div>
         <div className={styles.sidebarBody}>
-          {navItems
+          {mobileNavItems
             .filter((item) => !(isMobileApp && item.path === '/admin-log'))
             .map((item) => (
               <Link
